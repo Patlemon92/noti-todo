@@ -8,7 +8,7 @@ import { useWins } from '../hooks/useWins';
 import { docToPlaintext, snippet } from '../lib/tiptap';
 import { getPage } from '../lib/db';
 import type { Page } from '../lib/types';
-import CaptureSheet from '../components/page/CaptureSheet';
+import QuickAddSheet from '../components/page/QuickAddSheet';
 
 function colorForParent(id: string | null | undefined): string {
   if (!id) return '#8db4c8';
@@ -33,7 +33,7 @@ export default function FocusView() {
   } = useFocusTask();
   const { wins, reload: reloadWins } = useWins();
   const [parents, setParents] = useState<Record<string, Page | null>>({});
-  const [captureOpen, setCaptureOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
 
   // load parent labels for current + alts
   useEffect(() => {
@@ -76,7 +76,7 @@ export default function FocusView() {
   return (
     <div className="min-h-[100dvh] pb-32 pt-3">
       <div className="view-narrow">
-      <TopStrip onAdd={() => setCaptureOpen(true)} onProgress={() => {}} />
+      <TopStrip onAdd={() => setAddOpen(true)} />
 
       <div className="px-3.5 pt-2.5 pb-1 text-center font-mono text-[13px] uppercase tracking-mono-wide text-ink-soft">
         right now
@@ -137,12 +137,12 @@ export default function FocusView() {
           totalCount={totalCount}
           skippedCount={skippedCount}
           onReset={resetSkipped}
-          onAdd={() => setCaptureOpen(true)}
+          onAdd={() => setAddOpen(true)}
           onBoards={() => nav('/boards')}
         />
       ) : (
         <EmptyState
-          onAdd={() => setCaptureOpen(true)}
+          onAdd={() => setAddOpen(true)}
           onBoards={() => nav('/boards')}
         />
       )}
@@ -211,11 +211,11 @@ export default function FocusView() {
       )}
 
       </div>
-      <CaptureSheet
-        open={captureOpen}
-        onClose={() => setCaptureOpen(false)}
-        onSaved={(c) => {
-          if (c > 0) void reload();
+      <QuickAddSheet
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        onSaved={() => {
+          void reload();
           void reloadWins();
         }}
       />

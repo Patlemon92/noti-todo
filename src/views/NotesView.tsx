@@ -1,8 +1,9 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { formatDistanceToNowStrict } from 'date-fns';
 import BottomNav from '../components/ui/BottomNav';
 import TopStrip from '../components/ui/TopStrip';
-import IconButton from '../components/ui/IconButton';
+import QuickAddSheet from '../components/page/QuickAddSheet';
 import { usePages } from '../hooks/usePages';
 import { createPage } from '../lib/db';
 import { docToPlaintext, snippet } from '../lib/tiptap';
@@ -10,6 +11,7 @@ import { docToPlaintext, snippet } from '../lib/tiptap';
 export default function NotesView() {
   const nav = useNavigate();
   const { pages, reload } = usePages({ type: ['note', 'plain'] });
+  const [addOpen, setAddOpen] = useState(false);
 
   async function newNote() {
     const p = await createPage({ type: 'note', title: '' });
@@ -20,13 +22,13 @@ export default function NotesView() {
   return (
     <div className="min-h-[100dvh] pb-32 pt-3">
       <div className="view-grid">
-        <TopStrip right="minimal" />
+        <TopStrip onAdd={() => setAddOpen(true)} />
 
-        <div className="flex items-center justify-between px-3.5 pb-3">
+        <div className="flex items-baseline justify-between px-3.5 pb-3">
           <h1 className="font-serif text-[26px] font-semibold leading-none">notes</h1>
-          <IconButton onClick={newNote} aria-label="new note">
-            +
-          </IconButton>
+          <span className="font-mono text-[11px] uppercase tracking-mono text-ink-soft">
+            {pages.length} {pages.length === 1 ? 'note' : 'notes'}
+          </span>
         </div>
 
         {pages.length === 0 ? (
@@ -66,6 +68,11 @@ export default function NotesView() {
         )}
       </div>
 
+      <QuickAddSheet
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        onSaved={() => void reload()}
+      />
       <BottomNav />
     </div>
   );

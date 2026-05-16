@@ -24,7 +24,9 @@ import clsx from 'clsx';
 import BottomNav from '../components/ui/BottomNav';
 import TopStrip from '../components/ui/TopStrip';
 import Sheet from '../components/ui/Sheet';
+import QuickAddSheet from '../components/page/QuickAddSheet';
 import {
+  createPage,
   getDefaultBoard,
   listBoardTasks,
   listBoards,
@@ -89,6 +91,9 @@ export default function BoardsView() {
 
   // per-column menu state
   const [menuColumnId, setMenuColumnId] = useState<string | null>(null);
+
+  // global add sheet
+  const [addOpen, setAddOpen] = useState(false);
 
   // ----- loaders -----
   async function loadBoards() {
@@ -276,6 +281,26 @@ export default function BoardsView() {
   }
 
   /** Delete a column. If it has tasks, they're moved to `moveTo` first. */
+  async function addTaskToColumn(columnId: string, title: string) {
+    if (!active) return;
+    const trimmed = title.trim();
+    if (!trimmed) return;
+    const isDefault = ['today', 'doing', 'waiting', 'done'].includes(columnId);
+    const existing = byColumn[columnId] ?? [];
+    const sortOrder = existing.length;
+    await createPage({
+      type: 'task',
+      title: trimmed,
+      parent_id: active.id,
+      properties: {
+        column_id: columnId,
+        ...(isDefault ? { status: columnId as TaskStatus } : {}),
+      },
+      sort_order: sortOrder,
+    });
+    await loadTasks(active.id);
+  }
+
   async function deleteColumn(columnId: string, moveTo?: string) {
     if (!active) return;
     if (columns.length <= 1) return; // keep at least one
@@ -337,7 +362,7 @@ export default function BoardsView() {
   return (
     <div className="min-h-[100dvh] pb-32 pt-3">
       <div className="view-wide">
-      <TopStrip right="minimal" />
+      <TopStrip onAdd={() => setAddOpen(true)} />
 
       {/* board title — click to edit, ▾ opens switcher */}
       <div className="flex items-center justify-between gap-2 px-3.5 pb-3">
@@ -406,6 +431,7 @@ export default function BoardsView() {
                   onOpen={(id) => nav(`/page/${id}`)}
                   onRename={(name) => renameColumn(col.id, name)}
                   onOpenMenu={() => setMenuColumnId(col.id)}
+                  onAddTask={(title) => addTaskToColumn(col.id, title)}
                 />
               ))}
               <AddColumnButton onAdd={addColumn} disabled={columns.length >= 8} />
@@ -482,6 +508,11 @@ export default function BoardsView() {
       </Sheet>
 
       </div>
+      <QuickAddSheet
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        onSaved={() => active && void loadTasks(active.id)}
+      />
       <BottomNav />
     </div>
   );
@@ -565,6 +596,7 @@ function SortableColumn({
   onOpen,
   onRename,
   onOpenMenu,
+  onAddTask,
 }: {
   col: BoardColumn;
   tasks: Page[];
@@ -575,6 +607,7 @@ function SortableColumn({
   onOpen: (id: string) => void;
   onRename: (name: string) => void | Promise<void>;
   onOpenMenu: () => void;
+  onAddTask: (title: string) => void | Promise<void>;
 }) {
   const {
     setNodeRef,
@@ -648,24 +681,84 @@ function SortableColumn({
             onOpen={() => onOpen(t.id)}
           />
         ))}
-        {tasks.length === 0 && (
+        {tasks.length === 0 && !isOver && (
           <div
             className={clsx(
-              'rounded-[10px] border border-dashed py-3 text-center text-[12.5px] italic transition-colors',
-              isOver
-                ? 'border-coral text-coral'
-                : hasTaskDrag
-                  ? 'border-ink-faint text-ink-soft'
-                  : hasColumnDrag
-                    ? 'border-transparent text-ink-faint'
-                    : 'border-transparent text-ink-faint',
+              'rounded-[10px] border border-dashed py-2.5 text-center text-[12.5px] italic transition-colors',
+              hasTaskDrag
+                ? 'border-ink-faint text-ink-soft'
+                : 'border-transparent text-ink-faint',
             )}
           >
-            {isOver ? 'release to drop' : 'empty'}
+            empty
           </div>
         )}
+        {isOver && (
+          <div className="rounded-[10px] border border-dashed border-coral py-2.5 text-center text-[12.5px] italic text-coral">
+            release to drop
+          </div>
+        )}
+        <AddTaskInline onAdd={onAddTask} />
       </div>
     </div>
+  );
+}
+
+// ============================================================================
+// "+ add task" inline input — sits at the bottom of every column
+// ============================================================================
+function AddTaskInline({
+  onAdd,
+}: {
+  onAdd: (title: string) => void | Promise<void>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editing) inputRef.current?.focus();
+  }, [editing]);
+
+  function commit(stayOpen = false) {
+    if (draft.trim()) void onAdd(draft.trim());
+    setDraft('');
+    if (!stayOpen) setEditing(false);
+  }
+
+  if (editing) {
+    return (
+      <div className="rounded-[10px] border-[1.5px] border-dashed border-ink bg-bg-soft p-1.5">
+        <input
+          ref={inputRef}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={() => commit(false)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              // shift+enter keeps the input open so you can add several in a row
+              commit(e.shiftKey);
+            }
+            if (e.key === 'Escape') {
+              setDraft('');
+              setEditing(false);
+            }
+          }}
+          placeholder="task title…"
+          maxLength={140}
+          className="w-full rounded-md border-none bg-transparent px-2 py-1 text-[13.5px] outline-none placeholder:text-ink-faint"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <button
+      onClick={() => setEditing(true)}
+      className="flex w-full items-center justify-center gap-1.5 rounded-[10px] border border-dashed border-transparent py-1.5 font-mono text-[11px] uppercase tracking-mono text-ink-faint transition-colors hover:border-ink-faint hover:text-ink-soft"
+    >
+      <span className="text-[13px]">+</span> add task
+    </button>
   );
 }
 
