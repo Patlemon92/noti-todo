@@ -26,6 +26,7 @@ import TopStrip from '../components/ui/TopStrip';
 import Sheet from '../components/ui/Sheet';
 import QuickAddSheet from '../components/page/QuickAddSheet';
 import {
+  completeTask,
   createPage,
   getDefaultBoard,
   listBoardTasks,
@@ -432,6 +433,10 @@ export default function BoardsView() {
                   onRename={(name) => renameColumn(col.id, name)}
                   onOpenMenu={() => setMenuColumnId(col.id)}
                   onAddTask={(title) => addTaskToColumn(col.id, title)}
+                  onCompleteTask={async (task) => {
+                    await completeTask(task.id, task.title || 'untitled task');
+                    if (active) await loadTasks(active.id);
+                  }}
                 />
               ))}
               <AddColumnButton onAdd={addColumn} disabled={columns.length >= 8} />
@@ -597,6 +602,7 @@ function SortableColumn({
   onRename,
   onOpenMenu,
   onAddTask,
+  onCompleteTask,
 }: {
   col: BoardColumn;
   tasks: Page[];
@@ -608,6 +614,7 @@ function SortableColumn({
   onRename: (name: string) => void | Promise<void>;
   onOpenMenu: () => void;
   onAddTask: (title: string) => void | Promise<void>;
+  onCompleteTask: (task: Page) => void | Promise<void>;
 }) {
   const {
     setNodeRef,
@@ -679,6 +686,7 @@ function SortableColumn({
             task={t}
             dragging={draggingTaskId === t.id}
             onOpen={() => onOpen(t.id)}
+            onComplete={() => onCompleteTask(t)}
           />
         ))}
         {tasks.length === 0 && !isOver && (
@@ -893,10 +901,12 @@ function Card({
   task,
   dragging,
   onOpen,
+  onComplete,
 }: {
   task: Page;
   dragging: boolean;
   onOpen: () => void;
+  onComplete: () => void;
 }) {
   const { attributes, listeners, setNodeRef } = useDraggable({ id: task.id });
   const preview = snippet(docToPlaintext(task.body) || task.body_text || '', 60);
@@ -915,12 +925,24 @@ function Card({
       role="button"
       tabIndex={0}
       className={clsx(
-        'cursor-grab touch-none select-none rounded-[10px] border-[1.5px] border-ink bg-bg-soft px-2.5 py-2 text-[13.5px] leading-snug shadow-card-sm transition-opacity active:cursor-grabbing',
+        'group relative cursor-grab touch-none select-none rounded-[10px] border-[1.5px] border-ink bg-bg-soft px-2.5 py-2 pr-9 text-[13.5px] leading-snug shadow-card-sm transition-opacity active:cursor-grabbing',
         dragging && 'opacity-30',
       )}
     >
       <div className="font-medium">{task.title || 'untitled'}</div>
       {preview && <div className="mt-0.5 text-[12px] text-ink-soft">{preview}</div>}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          void onComplete();
+        }}
+        onPointerDown={(e) => e.stopPropagation()}
+        title="mark done"
+        aria-label="mark done"
+        className="absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full border-[1.5px] border-ink-faint bg-surface text-[11px] font-bold text-ink-soft opacity-0 transition-opacity hover:bg-mint hover:text-ink group-hover:opacity-100 md:opacity-0 max-md:opacity-100"
+      >
+        ✓
+      </button>
     </div>
   );
 }

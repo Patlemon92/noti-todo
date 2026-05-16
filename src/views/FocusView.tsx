@@ -9,6 +9,8 @@ import { docToPlaintext, snippet } from '../lib/tiptap';
 import { getPage } from '../lib/db';
 import type { Page } from '../lib/types';
 import QuickAddSheet from '../components/page/QuickAddSheet';
+import SnoozeSheet from '../components/page/SnoozeSheet';
+import { completeTask } from '../lib/db';
 
 function colorForParent(id: string | null | undefined): string {
   if (!id) return '#8db4c8';
@@ -34,6 +36,7 @@ export default function FocusView() {
   const { wins, reload: reloadWins } = useWins();
   const [parents, setParents] = useState<Record<string, Page | null>>({});
   const [addOpen, setAddOpen] = useState(false);
+  const [snoozePage, setSnoozePage] = useState<Page | null>(null);
 
   // load parent labels for current + alts
   useEffect(() => {
@@ -113,7 +116,7 @@ export default function FocusView() {
               </div>
             )}
           </div>
-          <div className="flex gap-2.5 px-5 pb-5">
+          <div className="flex gap-2 px-5 pb-5">
             <button
               onClick={startCurrent}
               className="flex-[2] rounded-[14px] border-2 border-ink bg-ink px-4 py-3.5 text-[16px] font-bold text-bg shadow-coral active:translate-x-[1px] active:translate-y-[1px] active:shadow-[1px_1px_0_var(--peach-deep)]"
@@ -121,10 +124,23 @@ export default function FocusView() {
               ▶ open task
             </button>
             <button
-              onClick={() => skip(current.id)}
-              className="flex-1 rounded-[14px] border-2 border-ink bg-transparent px-3 py-3.5 text-[14px] font-semibold shadow-card active:translate-x-[1px] active:translate-y-[1px] active:shadow-[1px_1px_0_var(--ink)]"
+              onClick={async () => {
+                await completeTask(current.id, current.title || 'untitled task');
+                skip(current.id);
+                void reload();
+                void reloadWins();
+              }}
+              title="done"
+              className="rounded-[14px] border-2 border-ink bg-mint px-4 py-3.5 text-[16px] font-bold text-ink shadow-card active:translate-x-[1px] active:translate-y-[1px] active:shadow-none"
             >
-              ↻ not this
+              ✓
+            </button>
+            <button
+              onClick={() => setSnoozePage(current)}
+              title="snooze"
+              className="rounded-[14px] border-2 border-ink bg-transparent px-4 py-3.5 text-[16px] font-semibold text-ink shadow-card active:translate-x-[1px] active:translate-y-[1px] active:shadow-none"
+            >
+              ↻
             </button>
           </div>
         </div>
@@ -217,6 +233,15 @@ export default function FocusView() {
         onSaved={() => {
           void reload();
           void reloadWins();
+        }}
+      />
+      <SnoozeSheet
+        open={!!snoozePage}
+        page={snoozePage}
+        onClose={() => setSnoozePage(null)}
+        onSnoozed={() => {
+          if (snoozePage) skip(snoozePage.id);
+          void reload();
         }}
       />
       <BottomNav />

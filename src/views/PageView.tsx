@@ -14,6 +14,7 @@ import StuckCard from '../components/page/StuckCard';
 import BreakDownSheet from '../components/page/BreakDownSheet';
 import ReminderSheet from '../components/page/ReminderSheet';
 import RemindersStrip from '../components/page/RemindersStrip';
+import SnoozeSheet from '../components/page/SnoozeSheet';
 import IconButton from '../components/ui/IconButton';
 import { supabase } from '../lib/supabase';
 import {
@@ -52,6 +53,7 @@ export default function PageView() {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [breakDownOpen, setBreakDownOpen] = useState(false);
   const [reminderOpen, setReminderOpen] = useState(false);
+  const [snoozeOpen, setSnoozeOpen] = useState(false);
   const [remindersVersion, setRemindersVersion] = useState(0);
   const [activeTimer, setActiveTimer] = useState<{
     minutes: number;
@@ -125,6 +127,7 @@ export default function PageView() {
     if (key === 'timer') setTimerOpen(true);
     if (key === 'page-link') setPickerOpen(true);
     if (key === 'reminder') setReminderOpen(true);
+    if (key === 'snooze') setSnoozeOpen(true);
   };
 
   const onPickPageToLink = async (target: Page) => {
@@ -335,6 +338,15 @@ export default function PageView() {
         pageTitle={page.title}
         onClose={() => setReminderOpen(false)}
         onSaved={() => setRemindersVersion((v) => v + 1)}
+      />
+      <SnoozeSheet
+        open={snoozeOpen}
+        page={page}
+        onClose={() => setSnoozeOpen(false)}
+        onSnoozed={() => {
+          // refresh page so the snoozed_until shows in subsequent loads
+          void save({});
+        }}
       />
       <PagePickerSheet
         open={pickerOpen}

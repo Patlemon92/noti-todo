@@ -28,8 +28,6 @@ const COMING_SOON: Partial<Record<ActionKey, string>> = {
   link: 'inline link via the floating toolbar already works. dedicated url-pin lands in stage 3.',
   image:
     'image attachments need supabase storage hooked up — coming in stage 3.',
-  snooze:
-    'snooze hides a task from the focus screen until a later time. coming in stage 3.',
   delegate:
     'sharing tasks with others lives in stage 4 (the collaboration milestone).',
 };
@@ -38,7 +36,12 @@ export default function ActionRow({ onAction }: Props) {
   const [comingSoon, setComingSoon] = useState<ActionKey | null>(null);
 
   function handle(key: ActionKey) {
-    if (key === 'timer' || key === 'page-link' || key === 'reminder') {
+    if (
+      key === 'timer' ||
+      key === 'page-link' ||
+      key === 'reminder' ||
+      key === 'snooze'
+    ) {
       onAction(key);
       return;
     }

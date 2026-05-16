@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import clsx from 'clsx';
+import { useCommandPalette } from '../cmd/CommandPalette';
 
 const ITEMS = [
   { to: '/focus', label: 'focus', icon: '★' },
@@ -14,6 +15,7 @@ const ITEMS = [
  * cream bg, 2px ink right edge, hard-offset chip on the active item.
  */
 export default function Sidebar() {
+  const cmd = useCommandPalette();
   return (
     <nav
       aria-label="primary"
@@ -51,6 +53,20 @@ export default function Sidebar() {
             </span>
           </NavLink>
         ))}
+
+        <div className="my-1 h-px w-7 bg-ink/15" />
+
+        <button
+          onClick={cmd.open}
+          title="command palette (⌘K)"
+          className="group relative flex h-[44px] w-[44px] items-center justify-center rounded-[12px] border border-dashed border-ink-faint text-ink-soft transition-colors hover:border-ink hover:bg-bg-soft hover:text-ink"
+          aria-label="open command palette"
+        >
+          <span className="font-mono text-[12px] leading-none">⌘K</span>
+          <span className="pointer-events-none absolute left-full ml-2 hidden whitespace-nowrap rounded-md border border-ink bg-ink px-2 py-1 font-mono text-[10px] uppercase tracking-mono text-bg group-hover:block">
+            command palette
+          </span>
+        </button>
       </div>
 
       <div className="font-mono text-[10px] uppercase tracking-mono-wide text-ink-faint">

@@ -8,6 +8,7 @@ import NotesView from './views/NotesView';
 import ProfileView from './views/ProfileView';
 import InstallPrompt from './pwa/InstallPrompt';
 import Sidebar from './components/ui/Sidebar';
+import CommandPalette from './components/cmd/CommandPalette';
 
 function Protected({ children }: { children: JSX.Element }) {
   const { session, loading } = useAuth();
@@ -93,6 +94,7 @@ export default function App() {
         </Routes>
         </main>
         <InstallPrompt />
+        <CommandPalette />
       </div>
     </AuthProvider>
   );
