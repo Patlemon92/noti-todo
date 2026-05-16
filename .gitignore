@@ -10,4 +10,5 @@ dist
 .vscode
 *.log
 .supabase
+supabase/.temp
 .claude
