@@ -262,6 +262,7 @@ export default function PageView() {
               countUp={activeTimer.countUp}
               notify={activeTimer.notify}
               taskTitle={page.title}
+              parentLabel={parent?.title}
               onStop={() => setActiveTimer(null)}
             />
           )}
