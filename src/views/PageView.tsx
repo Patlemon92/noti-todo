@@ -55,6 +55,8 @@ export default function PageView() {
   const [reminderOpen, setReminderOpen] = useState(false);
   const [snoozeOpen, setSnoozeOpen] = useState(false);
   const [remindersVersion, setRemindersVersion] = useState(0);
+  const [childrenVersion, setChildrenVersion] = useState(0);
+  const [pullToast, setPullToast] = useState<string | null>(null);
   const [activeTimer, setActiveTimer] = useState<{
     minutes: number;
     countUp: boolean;
@@ -173,11 +175,17 @@ export default function PageView() {
   const pullFromPage = async () => {
     if (!page) return;
     setPulling(true);
+    setPullToast(null);
     try {
       const r = await aiPullFromPage(page.id);
-      // Insert created tasks as child pages of this page; backend already wires page_links
+      if (!r.tasks || r.tasks.length === 0) {
+        setPullToast('no tasks found in this page');
+        return;
+      }
+      let inserted = 0;
+      let failed = 0;
       for (const t of r.tasks) {
-        await supabase.from('pages').insert({
+        const { error } = await supabase.from('pages').insert({
           owner_id: page.owner_id,
           parent_id: page.id,
           type: 'task',
@@ -195,13 +203,31 @@ export default function PageView() {
           },
           properties: { status: 'today' },
         });
-        // Also drop a backlink from this page → new task (best effort)
+        if (error) {
+          failed += 1;
+          // eslint-disable-next-line no-console
+          console.error('[pull tasks insert]', error);
+        } else {
+          inserted += 1;
+        }
+      }
+      if (inserted > 0) {
+        setChildrenVersion((v) => v + 1);
+        setPullToast(
+          `✓ added ${inserted} task${inserted === 1 ? '' : 's'}${failed ? ` · ${failed} failed` : ''}`,
+        );
+      } else if (failed > 0) {
+        setPullToast(`✕ ${failed} task${failed === 1 ? '' : 's'} failed to save`);
       }
     } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
       // eslint-disable-next-line no-console
       console.error('[pull tasks]', err);
+      setPullToast(`✕ ai error: ${msg.slice(0, 80)}`);
     } finally {
       setPulling(false);
+      // auto-clear toast after a beat
+      window.setTimeout(() => setPullToast(null), 4500);
     }
   };
 
@@ -303,7 +329,7 @@ export default function PageView() {
 
       {/* pull tasks from page (works on any page type) */}
       {(page.type === 'note' || page.type === 'plain' || isTask) && (
-        <div className="mx-3.5 mb-3">
+        <div className="mx-3.5 mb-3 flex flex-wrap items-center gap-2">
           <button
             onClick={pullFromPage}
             disabled={pulling}
@@ -312,10 +338,20 @@ export default function PageView() {
             <span className="text-coral">✦</span>
             {pulling ? 'pulling…' : 'pull tasks from this'}
           </button>
+          {pullToast && (
+            <span
+              className={
+                'inline-flex items-center rounded-pill border-[1.5px] border-ink px-3 py-1 text-[12px] font-medium shadow-card-sm transition-opacity ' +
+                (pullToast.startsWith('✓') ? 'bg-mint' : pullToast.startsWith('no ') ? 'bg-bg-soft' : 'bg-rose')
+              }
+            >
+              {pullToast}
+            </span>
+          )}
         </div>
       )}
 
-      <ChildPages parentId={page.id} parentType={page.type} />
+      <ChildPages parentId={page.id} parentType={page.type} refreshKey={childrenVersion} />
       <Backlinks pageId={page.id} />
 
       {/* close fab */}

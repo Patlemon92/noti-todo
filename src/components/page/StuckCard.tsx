@@ -12,16 +12,28 @@ export default function StuckCard({ pageId }: Props) {
   const [response, setResponse] = useState<string | null>(null);
   const [kind, setKind] = useState<'question' | 'action'>('question');
 
+  const [errMsg, setErrMsg] = useState<string | null>(null);
+
   async function go() {
     setStatus('loading');
+    setErrMsg(null);
     try {
       const r = await aiStuck(pageId);
+      // eslint-disable-next-line no-console
+      console.info('[stuck]', r);
+      if (!r.response || !r.response.trim()) {
+        setErrMsg('ai returned an empty response');
+        setStatus('error');
+        return;
+      }
       setResponse(r.response);
       setKind(r.kind);
       setStatus('shown');
     } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
       // eslint-disable-next-line no-console
       console.error('[stuck]', err);
+      setErrMsg(msg.slice(0, 140));
       setStatus('error');
     }
   }
@@ -46,11 +58,19 @@ export default function StuckCard({ pageId }: Props) {
 
   if (status === 'error') {
     return (
-      <div className="mx-3.5 mb-3 flex items-center justify-between rounded-[14px] border-[1.5px] border-rose-deep bg-rose/40 px-3.5 py-3 text-[13px]">
-        <span>ai is napping — try again in a sec</span>
-        <button onClick={() => setStatus('idle')} className="font-mono text-[11px] uppercase">
-          dismiss
-        </button>
+      <div className="mx-3.5 mb-3 flex items-start justify-between gap-3 rounded-[14px] border-[1.5px] border-rose-deep bg-rose/40 px-3.5 py-3 text-[13px]">
+        <div className="flex-1">
+          <div className="font-semibold">ai is napping</div>
+          {errMsg && <div className="mt-0.5 text-[11px] text-ink-soft">{errMsg}</div>}
+        </div>
+        <div className="flex flex-col gap-1">
+          <button onClick={go} className="font-mono text-[11px] uppercase underline">
+            retry
+          </button>
+          <button onClick={() => setStatus('idle')} className="font-mono text-[11px] uppercase">
+            dismiss
+          </button>
+        </div>
       </div>
     );
   }

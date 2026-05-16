@@ -7,6 +7,7 @@ import { docToPlaintext, snippet } from '../../lib/tiptap';
 interface Props {
   parentId: string;
   parentType: PageType;
+  refreshKey?: number;
 }
 
 const TYPE_GLYPH: Record<PageType, string> = {
@@ -16,7 +17,7 @@ const TYPE_GLYPH: Record<PageType, string> = {
   plain: '·',
 };
 
-export default function ChildPages({ parentId, parentType }: Props) {
+export default function ChildPages({ parentId, parentType, refreshKey = 0 }: Props) {
   const [pages, setPages] = useState<Page[]>([]);
   const [creating, setCreating] = useState(false);
 
@@ -27,7 +28,7 @@ export default function ChildPages({ parentId, parentType }: Props) {
 
   useEffect(() => {
     void reload();
-  }, [parentId]);
+  }, [parentId, refreshKey]);
 
   async function addSubpage() {
     setCreating(true);
