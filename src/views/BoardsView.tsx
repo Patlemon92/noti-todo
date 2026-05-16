@@ -167,10 +167,27 @@ export default function BoardsView() {
   async function renameBoard(boardId: string, title: string) {
     const trimmed = title.trim();
     if (!trimmed) return;
-    // optimistic
     setBoards((cur) => cur.map((b) => (b.id === boardId ? { ...b, title: trimmed } : b)));
     if (active?.id === boardId) setActive({ ...active, title: trimmed });
     await updatePage(boardId, { title: trimmed });
+  }
+
+  async function renameColumn(columnId: string, name: string) {
+    if (!active) return;
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    const props = (active.properties as BoardProperties | undefined) ?? {};
+    const existing = props.columns ?? DEFAULT_BOARD_COLUMNS;
+    const nextColumns = existing.map((c) =>
+      c.id === columnId ? { ...c, name: trimmed } : c,
+    );
+    if (nextColumns.every((c, i) => c === existing[i])) return;
+    const nextProps: BoardProperties = { ...props, columns: nextColumns };
+    // optimistic
+    const updatedBoard = { ...active, properties: nextProps } as Page;
+    setActive(updatedBoard);
+    setBoards((cur) => cur.map((b) => (b.id === active.id ? updatedBoard : b)));
+    await updatePage(active.id, { properties: nextProps });
   }
 
   return (
@@ -233,6 +250,7 @@ export default function BoardsView() {
                 hasDrag={!!dragId}
                 draggingId={dragId}
                 onOpen={(id) => nav(`/page/${id}`)}
+                onRename={(name) => renameColumn(col.id, name)}
               />
             ))}
           </div>
@@ -399,6 +417,7 @@ function Column({
   hasDrag,
   draggingId,
   onOpen,
+  onRename,
 }: {
   col: BoardColumn;
   tasks: Page[];
@@ -406,6 +425,7 @@ function Column({
   hasDrag: boolean;
   draggingId: string | null;
   onOpen: (id: string) => void;
+  onRename: (name: string) => void | Promise<void>;
 }) {
   const { setNodeRef } = useDroppable({ id: `col:${col.id}` });
 
@@ -421,15 +441,15 @@ function Column({
     >
       <div
         className={clsx(
-          'flex items-center justify-between rounded-t-[12px] border-b-[1.5px] border-ink px-3 py-2 font-mono text-[12px] uppercase tracking-mono-wide transition-colors',
+          'flex items-center justify-between rounded-t-[12px] border-b-[1.5px] border-ink px-3 py-1.5 font-mono text-[12px] uppercase tracking-mono-wide transition-colors',
           COLOR_BG[col.color],
         )}
       >
-        <span className="flex items-center gap-1.5">
-          {col.name}
-          {isOver && <span className="text-coral">→ drop here</span>}
-        </span>
-        <span className="text-ink-soft">{tasks.length}</span>
+        <ColumnNameEditor name={col.name} onSave={onRename} />
+        <div className="flex items-center gap-2">
+          {isOver && <span className="text-coral">→ drop</span>}
+          <span className="text-ink-soft">{tasks.length}</span>
+        </div>
       </div>
       <div className="flex flex-col gap-1.5 p-2 min-h-[80px]">
         {tasks.map((t) => (
@@ -456,6 +476,71 @@ function Column({
         )}
       </div>
     </div>
+  );
+}
+
+// ============================================================================
+// click-to-edit column name (sits inside the colored header)
+// ============================================================================
+function ColumnNameEditor({
+  name,
+  onSave,
+}: {
+  name: string;
+  onSave: (v: string) => void | Promise<void>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(name);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setDraft(name);
+  }, [name]);
+
+  useEffect(() => {
+    if (editing) {
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    }
+  }, [editing]);
+
+  function commit() {
+    setEditing(false);
+    if (draft.trim() && draft.trim() !== name) void onSave(draft.trim());
+    else setDraft(name);
+  }
+
+  if (editing) {
+    return (
+      <input
+        ref={inputRef}
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') commit();
+          if (e.key === 'Escape') {
+            setDraft(name);
+            setEditing(false);
+          }
+        }}
+        maxLength={24}
+        className="min-w-0 max-w-[160px] rounded-md border border-ink bg-surface px-1.5 py-0.5 font-mono text-[12px] uppercase tracking-mono-wide outline-none"
+      />
+    );
+  }
+
+  return (
+    <button
+      onClick={() => setEditing(true)}
+      title="rename column"
+      className="group flex items-center gap-1.5 truncate text-left"
+    >
+      <span className="truncate">{name || 'untitled'}</span>
+      <span className="text-[11px] text-ink-faint opacity-0 transition-opacity group-hover:opacity-100">
+        ✎
+      </span>
+    </button>
   );
 }
 
