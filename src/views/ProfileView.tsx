@@ -149,14 +149,18 @@ export default function ProfileView() {
             <StatCell label="wins" value={stats?.winsToday ?? '—'} />
             <StatCell label="open" value={stats?.openTasks ?? '—'} />
           </div>
-          <div className="flex items-baseline justify-between border-t border-dashed border-black/[0.18] bg-bg-soft px-3.5 py-2.5">
+          <button
+            onClick={() => nav('/done')}
+            className="flex w-full items-baseline justify-between border-t border-dashed border-black/[0.18] bg-bg-soft px-3.5 py-2.5 text-left transition-colors hover:bg-bg"
+            title="view all completed tasks"
+          >
             <span className="font-mono text-[11px] uppercase tracking-mono text-ink-soft">
-              completed all-time
+              completed all-time →
             </span>
             <span className="font-mono text-[15px] tabular-nums">
               {stats?.completedTotal ?? '—'}
             </span>
-          </div>
+          </button>
           <div className="flex items-baseline justify-between border-t border-dashed border-black/[0.18] bg-bg-soft px-3.5 py-2.5">
             <span className="font-mono text-[11px] uppercase tracking-mono text-ink-soft">
               pages total

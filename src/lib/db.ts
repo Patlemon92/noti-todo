@@ -221,6 +221,22 @@ export async function completeTask(pageId: string, title: string): Promise<void>
   });
 }
 
+export async function uncompleteTask(pageId: string): Promise<void> {
+  await updatePage(pageId, { completed_at: null });
+}
+
+export async function listCompletedTasks(limit = 200): Promise<Page[]> {
+  const { data, error } = await supabase
+    .from('pages')
+    .select(PAGE_COLS)
+    .eq('type', 'task')
+    .not('completed_at', 'is', null)
+    .order('completed_at', { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return (data ?? []) as Page[];
+}
+
 export function toggleChecklistItem(
   checklist: ChecklistItem[] | undefined,
   itemId: string,

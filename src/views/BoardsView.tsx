@@ -282,6 +282,21 @@ export default function BoardsView() {
   }
 
   /** Delete a column. If it has tasks, they're moved to `moveTo` first. */
+  async function createBoard(title: string) {
+    const trimmed = title.trim();
+    if (!trimmed) return;
+    const board = await createPage({
+      type: 'board',
+      title: trimmed,
+      properties: {
+        color: 'sky',
+        columns: DEFAULT_BOARD_COLUMNS.map((c, i) => ({ ...c, sort_order: i })),
+      } as BoardProperties,
+    });
+    setBoards((cur) => [...cur, board]);
+    setActive(board);
+  }
+
   async function addTaskToColumn(columnId: string, title: string) {
     if (!active) return;
     const trimmed = title.trim();
@@ -362,10 +377,21 @@ export default function BoardsView() {
 
   return (
     <div className="min-h-[100dvh] pb-32 pt-3">
+      <div className="md:flex md:items-start md:gap-0">
+      <BoardRail
+        boards={boards}
+        activeId={active?.id ?? null}
+        onPick={(id) => {
+          const b = boards.find((x) => x.id === id);
+          if (b) setActive(b);
+        }}
+        onCreate={createBoard}
+      />
+      <div className="md:min-w-0 md:flex-1">
       <div className="view-wide">
       <TopStrip onAdd={() => setAddOpen(true)} />
 
-      {/* board title — click to edit, ▾ opens switcher */}
+      {/* board title — click to edit, ▾ opens switcher (mobile only) */}
       <div className="flex items-center justify-between gap-2 px-3.5 pb-3">
         <div className="flex min-w-0 flex-1 items-center gap-2.5">
           <span
@@ -385,7 +411,7 @@ export default function BoardsView() {
         <button
           onClick={() => setSwitcher(true)}
           aria-label="switch board"
-          className="icon-btn font-mono text-[14px]"
+          className="icon-btn font-mono text-[14px] md:hidden"
         >
           ▾
         </button>
@@ -503,15 +529,17 @@ export default function BoardsView() {
               </button>
             </div>
           ))}
-          <button
-            disabled
-            className="flex items-center gap-2.5 rounded-[12px] border-[1.5px] border-dashed border-ink-faint px-3 py-2.5 text-left text-[14px] text-ink-faint"
-          >
-            + new board (stage 3)
-          </button>
+          <NewBoardInlineSheet
+            onCreate={async (title) => {
+              await createBoard(title);
+              setSwitcher(false);
+            }}
+          />
         </div>
       </Sheet>
 
+      </div>
+      </div>
       </div>
       <QuickAddSheet
         open={addOpen}
@@ -520,6 +548,145 @@ export default function BoardsView() {
       />
       <BottomNav />
     </div>
+  );
+}
+
+// ============================================================================
+// inline "new board" row used inside the mobile switcher sheet
+// ============================================================================
+function NewBoardInlineSheet({
+  onCreate,
+}: {
+  onCreate: (title: string) => void | Promise<void>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editing) inputRef.current?.focus();
+  }, [editing]);
+
+  function commit() {
+    if (draft.trim()) void onCreate(draft.trim());
+    setDraft('');
+    setEditing(false);
+  }
+
+  if (editing) {
+    return (
+      <div className="rounded-[12px] border-[1.5px] border-dashed border-ink bg-bg-soft p-2">
+        <input
+          ref={inputRef}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') commit();
+            if (e.key === 'Escape') {
+              setDraft('');
+              setEditing(false);
+            }
+          }}
+          placeholder="board name…"
+          maxLength={40}
+          className="w-full border-none bg-transparent px-2 py-1.5 text-[14px] outline-none placeholder:text-ink-faint"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <button
+      onClick={() => setEditing(true)}
+      className="flex items-center gap-2.5 rounded-[12px] border-[1.5px] border-dashed border-ink-faint px-3 py-2.5 text-left text-[14px] text-ink-soft transition-colors hover:border-ink hover:text-ink"
+    >
+      <span className="text-[16px]">+</span> new board
+    </button>
+  );
+}
+
+// ============================================================================
+// desktop board rail — list + create
+// ============================================================================
+function BoardRail({
+  boards,
+  activeId,
+  onPick,
+  onCreate,
+}: {
+  boards: Page[];
+  activeId: string | null;
+  onPick: (id: string) => void;
+  onCreate: (title: string) => void | Promise<void>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editing) inputRef.current?.focus();
+  }, [editing]);
+
+  function commit() {
+    if (draft.trim()) void onCreate(draft.trim());
+    setDraft('');
+    setEditing(false);
+  }
+
+  return (
+    <aside className="hidden md:flex md:w-[260px] md:flex-shrink-0 md:flex-col md:gap-1 md:border-r md:border-ink/15 md:px-3 md:pt-12 md:pb-6">
+      <div className="px-1 pb-2 font-mono text-[11px] uppercase tracking-mono-wide text-ink-soft">
+        boards
+      </div>
+      {boards.map((b) => (
+        <button
+          key={b.id}
+          onClick={() => onPick(b.id)}
+          className={clsx(
+            'flex items-center gap-2.5 rounded-[10px] px-2.5 py-2 text-left text-[13.5px] font-medium transition-colors',
+            activeId === b.id
+              ? 'border-[1.5px] border-ink bg-bg-soft text-ink shadow-card-sm'
+              : 'border-[1.5px] border-transparent text-ink hover:bg-bg-soft',
+          )}
+        >
+          <span
+            className={clsx(
+              'block h-[10px] w-[10px] flex-shrink-0 rounded-full border-[1.5px] border-ink',
+              COLOR_BG[(b.properties as BoardProperties | undefined)?.color ?? 'sky'],
+            )}
+          />
+          <span className="truncate">{b.title || 'untitled'}</span>
+        </button>
+      ))}
+      {editing ? (
+        <div className="mt-1 rounded-[10px] border-[1.5px] border-dashed border-ink bg-bg-soft p-1.5">
+          <input
+            ref={inputRef}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={commit}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') commit();
+              if (e.key === 'Escape') {
+                setDraft('');
+                setEditing(false);
+              }
+            }}
+            placeholder="board name…"
+            maxLength={40}
+            className="w-full border-none bg-transparent px-2 py-1 text-[13.5px] outline-none placeholder:text-ink-faint"
+          />
+        </div>
+      ) : (
+        <button
+          onClick={() => setEditing(true)}
+          className="mt-1 flex items-center gap-1.5 rounded-[10px] border border-dashed border-ink-faint px-2.5 py-2 font-mono text-[11px] uppercase tracking-mono text-ink-soft hover:border-ink hover:text-ink"
+        >
+          <span className="text-[14px]">+</span> new board
+        </button>
+      )}
+    </aside>
   );
 }
 

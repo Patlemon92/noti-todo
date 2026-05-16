@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import AuthView from './views/AuthView';
@@ -6,6 +7,7 @@ import PageView from './views/PageView';
 import BoardsView from './views/BoardsView';
 import NotesView from './views/NotesView';
 import ProfileView from './views/ProfileView';
+import DoneView from './views/DoneView';
 import InstallPrompt from './pwa/InstallPrompt';
 import Sidebar from './components/ui/Sidebar';
 import CommandPalette from './components/cmd/CommandPalette';
@@ -40,6 +42,7 @@ export default function App() {
     <AuthProvider>
       <div>
         <ShellChrome />
+        <RouteBlur />
         <main className="md:ml-[64px]">
         <Routes>
           <Route
@@ -83,6 +86,14 @@ export default function App() {
             }
           />
           <Route
+            path="/done"
+            element={
+              <Protected>
+                <DoneView />
+              </Protected>
+            }
+          />
+          <Route
             path="/page/:id"
             element={
               <Protected>
@@ -105,4 +116,22 @@ function ShellChrome() {
   const { session } = useAuth();
   if (!session) return null;
   return <Sidebar />;
+}
+
+/**
+ * Blurs any focused input / contenteditable on every route change.
+ * Stops iOS Safari from keeping the on-screen keyboard up when you
+ * tap the bottom nav while a previous view's editor was focused.
+ */
+function RouteBlur() {
+  const location = useLocation();
+  useEffect(() => {
+    const el = document.activeElement as HTMLElement | null;
+    if (!el) return;
+    const tag = el.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || el.isContentEditable) {
+      el.blur();
+    }
+  }, [location.pathname]);
+  return null;
 }
