@@ -25,8 +25,6 @@ const PILLS: { key: ActionKey; label: string }[] = [
 ];
 
 const COMING_SOON: Partial<Record<ActionKey, string>> = {
-  reminder:
-    'reminders ship in stage 3 with push notifications. for now jot the time in the body.',
   link: 'inline link via the floating toolbar already works. dedicated url-pin lands in stage 3.',
   image:
     'image attachments need supabase storage hooked up — coming in stage 3.',
@@ -40,7 +38,7 @@ export default function ActionRow({ onAction }: Props) {
   const [comingSoon, setComingSoon] = useState<ActionKey | null>(null);
 
   function handle(key: ActionKey) {
-    if (key === 'timer' || key === 'page-link') {
+    if (key === 'timer' || key === 'page-link' || key === 'reminder') {
       onAction(key);
       return;
     }

@@ -35,7 +35,7 @@ function FullPageLoader() {
 export default function App() {
   return (
     <AuthProvider>
-      <div className="app-frame">
+      <div>
         <Routes>
           <Route
             path="/auth"

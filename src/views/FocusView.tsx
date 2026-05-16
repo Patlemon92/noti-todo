@@ -75,6 +75,7 @@ export default function FocusView() {
 
   return (
     <div className="min-h-[100dvh] pb-32 pt-3">
+      <div className="view-narrow">
       <TopStrip onAdd={() => setCaptureOpen(true)} onProgress={() => {}} />
 
       <div className="px-3.5 pt-2.5 pb-1 text-center font-mono text-[13px] uppercase tracking-mono-wide text-ink-soft">
@@ -209,6 +210,7 @@ export default function FocusView() {
         </div>
       )}
 
+      </div>
       <CaptureSheet
         open={captureOpen}
         onClose={() => setCaptureOpen(false)}

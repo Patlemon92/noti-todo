@@ -12,6 +12,8 @@ import TimerChip from '../components/page/TimerChip';
 import SummaryPopup from '../components/page/SummaryPopup';
 import StuckCard from '../components/page/StuckCard';
 import BreakDownSheet from '../components/page/BreakDownSheet';
+import ReminderSheet from '../components/page/ReminderSheet';
+import RemindersStrip from '../components/page/RemindersStrip';
 import IconButton from '../components/ui/IconButton';
 import { supabase } from '../lib/supabase';
 import {
@@ -49,6 +51,8 @@ export default function PageView() {
   const [timerOpen, setTimerOpen] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [breakDownOpen, setBreakDownOpen] = useState(false);
+  const [reminderOpen, setReminderOpen] = useState(false);
+  const [remindersVersion, setRemindersVersion] = useState(0);
   const [activeTimer, setActiveTimer] = useState<{
     minutes: number;
     countUp: boolean;
@@ -120,6 +124,7 @@ export default function PageView() {
   const onAction = async (key: ActionKey) => {
     if (key === 'timer') setTimerOpen(true);
     if (key === 'page-link') setPickerOpen(true);
+    if (key === 'reminder') setReminderOpen(true);
   };
 
   const onPickPageToLink = async (target: Page) => {
@@ -222,6 +227,7 @@ export default function PageView() {
 
   return (
     <div className="min-h-[100dvh] animate-pageIn pb-24 pt-3">
+      <div className="view-mid">
       {/* top bar */}
       <div className="flex items-center justify-between px-3.5 pb-3">
         <button
@@ -249,6 +255,7 @@ export default function PageView() {
       {isTask && (
         <>
           <ActionRow onAction={onAction} />
+          <RemindersStrip pageId={page.id} refreshKey={remindersVersion} />
           {activeTimer && (
             <TimerChip
               minutes={activeTimer.minutes}
@@ -321,6 +328,13 @@ export default function PageView() {
         onClose={() => setTimerOpen(false)}
         onStart={(opts) => setActiveTimer(opts)}
       />
+      <ReminderSheet
+        open={reminderOpen}
+        pageId={page.id}
+        pageTitle={page.title}
+        onClose={() => setReminderOpen(false)}
+        onSaved={() => setRemindersVersion((v) => v + 1)}
+      />
       <PagePickerSheet
         open={pickerOpen}
         onClose={() => setPickerOpen(false)}
@@ -349,6 +363,7 @@ export default function PageView() {
         }}
         onMarkDone={onSummaryMarkDone}
       />
+      </div>
     </div>
   );
 }

@@ -68,6 +68,18 @@ importers:
       tippy.js:
         specifier: ^6.3.7
         version: 6.3.7
+      workbox-expiration:
+        specifier: ^7.1.0
+        version: 7.4.1
+      workbox-precaching:
+        specifier: ^7.1.0
+        version: 7.4.1
+      workbox-routing:
+        specifier: ^7.1.0
+        version: 7.4.1
+      workbox-strategies:
+        specifier: ^7.1.0
+        version: 7.4.1
       workbox-window:
         specifier: ^7.1.0
         version: 7.4.1

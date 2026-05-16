@@ -336,6 +336,7 @@ export default function BoardsView() {
 
   return (
     <div className="min-h-[100dvh] pb-32 pt-3">
+      <div className="view-wide">
       <TopStrip right="minimal" />
 
       {/* board title — click to edit, ▾ opens switcher */}
@@ -480,6 +481,7 @@ export default function BoardsView() {
         </div>
       </Sheet>
 
+      </div>
       <BottomNav />
     </div>
   );
