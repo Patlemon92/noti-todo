@@ -103,6 +103,9 @@ export async function ensurePushSubscription(): Promise<SubscriptionResult> {
   const userId = userData.user?.id;
   if (!userId) return { ok: false, reason: 'not signed in' };
 
+  // Idempotent: insert if new, skip if the row already exists. Avoids the
+  // 403 you'd hit upserting against RLS that doesn't have an UPDATE policy
+  // (we don't need to update — endpoint is unique and the keys don't change).
   const { error } = await supabase
     .from('push_subscriptions')
     .upsert(
@@ -113,10 +116,12 @@ export async function ensurePushSubscription(): Promise<SubscriptionResult> {
         auth: arrayBufferToBase64Url(auth),
         user_agent: navigator.userAgent.slice(0, 200),
       },
-      { onConflict: 'endpoint' },
+      { onConflict: 'endpoint', ignoreDuplicates: true },
     );
 
   if (error) {
+    // 23505 means we raced and the row exists — that's fine for our purposes.
+    if ((error as { code?: string }).code === '23505') return { ok: true };
     // eslint-disable-next-line no-console
     console.error('[push subscribe upsert]', error);
     return { ok: false, reason: error.message };

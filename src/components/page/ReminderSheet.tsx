@@ -66,24 +66,38 @@ export default function ReminderSheet({
     setWarning(null);
 
     // Best-effort push subscription. We still save the reminder if push is
-    // refused — it'll just not fire on the lock screen.
+    // refused — it just won't fire on the lock screen for this device.
     const sub = await ensurePushSubscription();
-    if (!sub.ok) {
-      setWarning(`saved without lock-screen push (${sub.reason})`);
-    }
+    const pushWarning = sub.ok
+      ? null
+      : `reminder saved, but push didn't enable on this device (${sub.reason}). other devices will still get it.`;
 
     try {
-      await createReminder({
+      const created = await createReminder({
         page_id: pageId,
         due_at: due.toISOString(),
         text: text.trim() || undefined,
       });
+      // eslint-disable-next-line no-console
+      console.info('[reminder saved]', created.id, 'due', due.toISOString());
       onSaved();
-      reset();
-      onClose();
+      if (pushWarning) {
+        // surface the push-only warning briefly, but still close + reset
+        // so the user sees the pill on the page
+        setWarning(pushWarning);
+        window.setTimeout(() => {
+          reset();
+          onClose();
+        }, 1800);
+      } else {
+        reset();
+        onClose();
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      setWarning(msg);
+      // eslint-disable-next-line no-console
+      console.error('[reminder save FAILED]', err);
+      setWarning(`save failed: ${msg}`);
       setStage('pick');
     }
   }

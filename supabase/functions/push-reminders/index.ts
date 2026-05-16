@@ -91,6 +91,13 @@ Deno.serve(async (req) => {
 
   const sent: string[] = [];
   const failures: Array<{ id: string; reason: string }> = [];
+  const subResults: Array<{
+    reminder_id: string;
+    endpoint: string;
+    ok: boolean;
+    status?: number;
+    error?: string;
+  }> = [];
 
   for (const r of due) {
     const page = Array.isArray(r.pages) ? r.pages[0] : r.pages;
@@ -113,6 +120,7 @@ Deno.serve(async (req) => {
 
     let pushedAny = false;
     for (const s of subs) {
+      const shortEndpoint = s.endpoint.slice(-12);
       try {
         await webpush.sendNotification(
           {
@@ -123,8 +131,17 @@ Deno.serve(async (req) => {
           { TTL: 60 * 60 * 24 },
         );
         pushedAny = true;
+        subResults.push({ reminder_id: r.id, endpoint: shortEndpoint, ok: true });
       } catch (err: any) {
-        const code = err?.statusCode ?? err?.status;
+        const code: number | undefined = err?.statusCode ?? err?.status;
+        const reason = err?.message || String(err);
+        subResults.push({
+          reminder_id: r.id,
+          endpoint: shortEndpoint,
+          ok: false,
+          status: code,
+          error: reason.slice(0, 200),
+        });
         // 404/410 → subscription is dead, prune it
         if (code === 404 || code === 410) {
           await admin
@@ -135,8 +152,8 @@ Deno.serve(async (req) => {
       }
     }
 
-    // mark sent_at regardless (we don't want to re-send forever if a user
-    // has no live subs — reminders fall out of the queue after one attempt)
+    // mark sent_at regardless — we don't want to re-send forever if a user
+    // has no live subs. reminders fall out of the queue after one attempt.
     const nextPayload = {
       ...(r.payload ?? {}),
       sent_at: new Date().toISOString(),
@@ -144,11 +161,16 @@ Deno.serve(async (req) => {
     await admin.from('page_actions').update({ payload: nextPayload }).eq('id', r.id);
 
     if (pushedAny) sent.push(r.id);
-    else failures.push({ id: r.id, reason: 'no live subs' });
+    else failures.push({ id: r.id, reason: subs.length ? 'all subs rejected' : 'no subs' });
   }
 
   return new Response(
-    JSON.stringify({ scanned: due.length, sent: sent.length, failures }),
+    JSON.stringify({
+      scanned: due.length,
+      sent: sent.length,
+      failures,
+      sub_results: subResults,
+    }),
     { headers: { ...corsHeaders, 'content-type': 'application/json' } },
   );
 });
