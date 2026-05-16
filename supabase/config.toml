@@ -1,0 +1,14 @@
+# noti-todo · supabase project config
+project_id = "noti-todo"
+
+[functions.ai-task-capture]
+verify_jwt = true
+
+[functions.ai-pull-from-page]
+verify_jwt = true
+
+[functions.ai-break-down]
+verify_jwt = true
+
+[functions.ai-stuck]
+verify_jwt = true

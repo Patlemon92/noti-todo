@@ -1,0 +1,338 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --bg: #f3ebd9;
+    --bg-soft: #f7f1e1;
+    --surface: #ffffff;
+    --ink: #2a2520;
+    --ink-soft: #8a8278;
+    --ink-faint: #c4bdb3;
+    --peach: #fde0d4;
+    --peach-deep: #e88562;
+    --mint: #d9ecdc;
+    --mint-deep: #7fb389;
+    --lavender: #e4dcf2;
+    --lavender-deep: #a896d4;
+    --butter: #fbebbc;
+    --butter-deep: #e8c75f;
+    --sky: #d9e7ef;
+    --sky-deep: #8db4c8;
+    --rose: #f5d6d6;
+    --rose-deep: #d48a8a;
+  }
+
+  * {
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  html,
+  body,
+  #root {
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+
+  html,
+  body {
+    background-color: var(--bg);
+    color: var(--ink);
+    font-family: 'Bricolage Grotesque', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    overscroll-behavior-y: none;
+  }
+
+  body {
+    background-image: radial-gradient(
+      circle at 1px 1px,
+      rgba(42, 37, 32, 0.08) 1px,
+      transparent 0
+    );
+    background-size: 22px 22px;
+  }
+
+  /* Reset list/button styles a touch */
+  button {
+    font-family: inherit;
+    cursor: pointer;
+  }
+
+  input,
+  textarea {
+    font-family: inherit;
+  }
+
+  ::selection {
+    background: var(--peach);
+    color: var(--ink);
+  }
+}
+
+@layer components {
+  /* === buttons === */
+  .btn {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-[14px] border-2 border-ink bg-surface px-4 py-2.5
+           font-sans text-sm font-semibold shadow-card-sm transition-transform
+           active:translate-x-[2px] active:translate-y-[2px] active:shadow-none;
+  }
+  .btn-primary {
+    @apply bg-ink text-bg shadow-[3px_3px_0_var(--peach-deep)]
+           active:shadow-[1px_1px_0_var(--peach-deep)];
+  }
+  .btn-ghost {
+    @apply border-2 border-ink bg-transparent text-ink shadow-card;
+  }
+
+  /* dashed action pill (page action row) */
+  .pill-action {
+    @apply inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-pill border-[1.5px] border-dashed
+           border-ink-faint bg-transparent px-3.5 py-2 font-sans text-[13px] font-medium text-ink-soft
+           transition-all hover:border-solid hover:border-ink hover:text-ink
+           active:scale-[0.96] active:bg-bg-soft;
+  }
+
+  /* small icon button */
+  .icon-btn {
+    @apply flex h-[34px] w-[34px] items-center justify-center rounded-[10px] border-2 border-ink bg-surface
+           text-sm text-ink shadow-card-sm transition-transform
+           active:translate-x-[2px] active:translate-y-[2px] active:shadow-none;
+  }
+
+  /* surfaces */
+  .surface-card {
+    @apply rounded-card border-2 border-ink bg-surface shadow-card;
+  }
+  .surface-card-lg {
+    @apply rounded-[22px] border-[2.5px] border-ink bg-surface shadow-card-lg;
+  }
+
+  /* mono eyebrow label */
+  .mono-eyebrow {
+    @apply font-mono text-[12px] uppercase tracking-mono-wide text-ink-soft;
+  }
+
+  /* page mention pill (Tiptap node view) */
+  .mention-pill {
+    @apply inline-flex items-center gap-1 rounded-md border-[1.5px] border-ink bg-bg-soft px-1.5 py-[1px]
+           text-[0.95em] font-medium leading-tight text-ink no-underline
+           hover:bg-butter;
+  }
+  .mention-pill::before {
+    content: '@';
+    @apply text-ink-soft;
+  }
+}
+
+/* === Tiptap editor base === */
+.tiptap {
+  outline: none;
+  min-height: 220px;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--ink);
+}
+.tiptap p {
+  margin: 0 0 0.4em;
+}
+.tiptap p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: var(--ink-faint);
+  float: left;
+  height: 0;
+  pointer-events: none;
+  font-style: italic;
+}
+.tiptap h1 {
+  font-family: 'Fraunces', serif;
+  font-weight: 600;
+  font-size: 26px;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  margin: 0.6em 0 0.3em;
+}
+.tiptap h2 {
+  font-family: 'Fraunces', serif;
+  font-weight: 600;
+  font-size: 20px;
+  margin: 0.6em 0 0.25em;
+}
+.tiptap h3 {
+  font-family: 'Fraunces', serif;
+  font-weight: 600;
+  font-size: 17px;
+  margin: 0.5em 0 0.2em;
+}
+.tiptap ul,
+.tiptap ol {
+  padding-left: 1.25em;
+  margin: 0 0 0.5em;
+}
+.tiptap li {
+  margin: 0.15em 0;
+}
+.tiptap blockquote {
+  border-left: 2.5px solid var(--ink);
+  padding-left: 0.8em;
+  margin: 0.5em 0;
+  color: var(--ink-soft);
+  font-style: italic;
+}
+.tiptap code {
+  background: var(--bg-soft);
+  border: 1px solid var(--ink-faint);
+  padding: 0.05em 0.3em;
+  border-radius: 4px;
+  font-family: 'VT323', monospace;
+  font-size: 0.95em;
+}
+.tiptap pre {
+  background: var(--ink);
+  color: var(--bg);
+  padding: 12px;
+  border-radius: 8px;
+  font-family: 'VT323', monospace;
+  font-size: 14px;
+  overflow-x: auto;
+}
+.tiptap a {
+  color: var(--peach-deep);
+  text-decoration: underline;
+  text-decoration-color: rgba(232, 133, 98, 0.5);
+}
+.tiptap ul[data-type='taskList'] {
+  list-style: none;
+  padding-left: 0;
+}
+.tiptap ul[data-type='taskList'] li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0.2em 0;
+}
+.tiptap ul[data-type='taskList'] li > label {
+  flex-shrink: 0;
+  margin-top: 4px;
+}
+.tiptap ul[data-type='taskList'] li > label > input {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid var(--ink);
+  border-radius: 50%;
+  background: var(--surface);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.tiptap ul[data-type='taskList'] li > label > input:checked {
+  background: var(--mint-deep);
+}
+.tiptap ul[data-type='taskList'] li > label > input:checked::after {
+  content: '✓';
+  color: var(--ink);
+  font-size: 10px;
+  font-weight: 700;
+}
+.tiptap ul[data-type='taskList'] li[data-checked='true'] > div > p {
+  color: var(--ink-soft);
+  text-decoration: line-through;
+  text-decoration-color: var(--ink-faint);
+}
+
+/* slash/mention popups */
+.tippy-box[data-theme~='noti'] {
+  background: var(--surface);
+  color: var(--ink);
+  border: 2px solid var(--ink);
+  border-radius: 12px;
+  box-shadow: 3px 3px 0 var(--ink);
+  padding: 4px;
+}
+.tippy-box[data-theme~='noti'] .tippy-arrow {
+  display: none;
+}
+
+.suggest-popup {
+  min-width: 220px;
+  max-width: 280px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+.suggest-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 13.5px;
+  cursor: pointer;
+  color: var(--ink);
+}
+.suggest-item .ico {
+  font-family: 'VT323', monospace;
+  color: var(--ink-soft);
+  font-size: 14px;
+  width: 18px;
+  text-align: center;
+}
+.suggest-item .desc {
+  font-family: 'VT323', monospace;
+  color: var(--ink-soft);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  margin-left: auto;
+}
+.suggest-item.is-selected,
+.suggest-item:hover {
+  background: var(--peach);
+}
+.suggest-empty {
+  padding: 10px;
+  font-size: 12px;
+  color: var(--ink-soft);
+  text-align: center;
+}
+
+/* floating toolbar */
+.floating-toolbar {
+  display: flex;
+  gap: 2px;
+  padding: 4px;
+  background: var(--ink);
+  color: var(--bg);
+  border-radius: 10px;
+  box-shadow: 3px 3px 0 rgba(42, 37, 32, 0.25);
+}
+.floating-toolbar button {
+  background: transparent;
+  border: none;
+  color: var(--bg);
+  border-radius: 6px;
+  padding: 5px 8px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  min-width: 28px;
+  cursor: pointer;
+  opacity: 0.75;
+}
+.floating-toolbar button:hover,
+.floating-toolbar button.active {
+  background: rgba(243, 235, 217, 0.18);
+  opacity: 1;
+}
+
+/* mobile-first frame on wide screens */
+@media (min-width: 950px) {
+  body {
+    padding: 0;
+  }
+  .app-frame {
+    max-width: 460px;
+    margin: 0 auto;
+  }
+}
