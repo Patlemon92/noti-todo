@@ -7,6 +7,7 @@ type Status = 'idle' | 'submitting' | 'confirm-sent' | 'reset-sent' | 'error';
 
 export default function AuthView() {
   const [mode, setMode] = useState<Mode>('signin');
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [status, setStatus] = useState<Status>('idle');
@@ -25,6 +26,11 @@ export default function AuthView() {
     const cleanEmail = email.trim().toLowerCase();
 
     if (mode === 'signup') {
+      if (!name.trim()) {
+        setStatus('error');
+        setError('what should i call you?');
+        return;
+      }
       if (password.length < 8) {
         setStatus('error');
         setError('password must be at least 8 characters.');
@@ -35,6 +41,7 @@ export default function AuthView() {
         password,
         options: {
           emailRedirectTo: `${window.location.origin}/focus`,
+          data: { name: name.trim() },
         },
       });
       if (error) {
@@ -123,6 +130,23 @@ export default function AuthView() {
               {mode === 'signup' ? 'create your account' : 'sign in with email'}
             </div>
             <div className="p-5">
+              {mode === 'signup' && (
+                <>
+                  <label className="mb-1.5 block font-mono text-[11px] uppercase tracking-mono-wide text-ink-soft">
+                    name
+                  </label>
+                  <input
+                    type="text"
+                    autoComplete="given-name"
+                    required
+                    placeholder="what should i call you?"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="mb-3 w-full rounded-[10px] border-2 border-ink bg-bg-soft px-3 py-2.5 text-[15px] outline-none placeholder:text-ink-faint focus:bg-surface"
+                  />
+                </>
+              )}
+
               <label className="mb-1.5 block font-mono text-[11px] uppercase tracking-mono-wide text-ink-soft">
                 email
               </label>
