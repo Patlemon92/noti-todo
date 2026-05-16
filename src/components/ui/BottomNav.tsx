@@ -5,6 +5,7 @@ const ITEMS = [
   { to: '/focus', label: 'focus', icon: '★' },
   { to: '/boards', label: 'boards', icon: '▦' },
   { to: '/notes', label: 'notes', icon: '✎' },
+  { to: '/profile', label: 'you', icon: '◉' },
 ] as const;
 
 export default function BottomNav() {
@@ -19,7 +20,7 @@ export default function BottomNav() {
           to={it.to}
           className={({ isActive }) =>
             clsx(
-              'flex h-[42px] items-center justify-center gap-1.5 rounded-[18px] px-4 font-sans text-[15px] font-semibold transition-colors',
+              'flex h-[42px] items-center justify-center gap-1.5 rounded-[18px] px-3 font-sans text-[14px] font-semibold transition-colors sm:px-4 sm:text-[15px]',
               isActive
                 ? 'bg-peach-deep text-ink'
                 : 'text-bg opacity-55 hover:opacity-90',

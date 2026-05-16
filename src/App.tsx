@@ -5,6 +5,7 @@ import FocusView from './views/FocusView';
 import PageView from './views/PageView';
 import BoardsView from './views/BoardsView';
 import NotesView from './views/NotesView';
+import ProfileView from './views/ProfileView';
 import InstallPrompt from './pwa/InstallPrompt';
 
 function Protected({ children }: { children: JSX.Element }) {
@@ -66,6 +67,14 @@ export default function App() {
             element={
               <Protected>
                 <NotesView />
+              </Protected>
+            }
+          />
+          <Route
+            path="/profile"
+            element={
+              <Protected>
+                <ProfileView />
               </Protected>
             }
           />

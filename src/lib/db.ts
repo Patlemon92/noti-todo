@@ -251,3 +251,74 @@ export async function addPageLink(sourceId: string, targetId: string): Promise<v
 }
 
 export type { PageLink };
+
+// ============================================================================
+// profile helpers
+// ============================================================================
+export interface ProfileSummary {
+  id: string;
+  display_name: string | null;
+  timezone: string;
+  created_at: string;
+}
+
+export async function getMyProfile(): Promise<ProfileSummary | null> {
+  const { data: userData } = await supabase.auth.getUser();
+  const userId = userData.user?.id;
+  if (!userId) return null;
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, display_name, timezone, created_at')
+    .eq('id', userId)
+    .maybeSingle();
+  if (error) throw error;
+  return (data as ProfileSummary) ?? null;
+}
+
+export async function updateMyProfile(
+  patch: Partial<Pick<ProfileSummary, 'display_name' | 'timezone'>>,
+): Promise<void> {
+  const { data: userData } = await supabase.auth.getUser();
+  const userId = userData.user?.id;
+  if (!userId) throw new Error('not signed in');
+  const { error } = await supabase
+    .from('profiles')
+    .update(patch)
+    .eq('id', userId);
+  if (error) throw error;
+}
+
+export interface FocusStats {
+  openTasks: number;
+  completedTotal: number;
+  completedToday: number;
+  winsToday: number;
+  totalPages: number;
+}
+
+export async function getStats(): Promise<FocusStats> {
+  const startOfDay = new Date();
+  startOfDay.setHours(0, 0, 0, 0);
+  const isoToday = startOfDay.toISOString();
+
+  const [openTasks, completedTotal, completedToday, winsToday, totalPages] = await Promise.all([
+    supabase.from('pages').select('id', { count: 'exact', head: true })
+      .eq('type', 'task').eq('archived', false).is('completed_at', null),
+    supabase.from('pages').select('id', { count: 'exact', head: true })
+      .eq('type', 'task').not('completed_at', 'is', null),
+    supabase.from('pages').select('id', { count: 'exact', head: true })
+      .eq('type', 'task').gte('completed_at', isoToday),
+    supabase.from('wins').select('id', { count: 'exact', head: true })
+      .gte('occurred_at', isoToday),
+    supabase.from('pages').select('id', { count: 'exact', head: true })
+      .eq('archived', false),
+  ]);
+
+  return {
+    openTasks: openTasks.count ?? 0,
+    completedTotal: completedTotal.count ?? 0,
+    completedToday: completedToday.count ?? 0,
+    winsToday: winsToday.count ?? 0,
+    totalPages: totalPages.count ?? 0,
+  };
+}
