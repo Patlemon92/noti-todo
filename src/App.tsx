@@ -7,6 +7,7 @@ import BoardsView from './views/BoardsView';
 import NotesView from './views/NotesView';
 import ProfileView from './views/ProfileView';
 import InstallPrompt from './pwa/InstallPrompt';
+import Sidebar from './components/ui/Sidebar';
 
 function Protected({ children }: { children: JSX.Element }) {
   const { session, loading } = useAuth();
@@ -37,6 +38,8 @@ export default function App() {
   return (
     <AuthProvider>
       <div>
+        <ShellChrome />
+        <main className="md:ml-[64px]">
         <Routes>
           <Route
             path="/auth"
@@ -88,8 +91,16 @@ export default function App() {
           />
           <Route path="*" element={<Navigate to="/focus" replace />} />
         </Routes>
+        </main>
         <InstallPrompt />
       </div>
     </AuthProvider>
   );
+}
+
+/** Only renders the desktop sidebar when the user is signed in. */
+function ShellChrome() {
+  const { session } = useAuth();
+  if (!session) return null;
+  return <Sidebar />;
 }

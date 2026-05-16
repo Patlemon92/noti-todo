@@ -12,7 +12,7 @@ export default function BottomNav() {
   return (
     <nav
       aria-label="primary"
-      className="fixed bottom-[14px] left-1/2 z-50 flex -translate-x-1/2 gap-[2px] rounded-[24px] border-2 border-ink bg-ink p-[6px] shadow-[4px_4px_0_rgba(42,37,32,0.22)]"
+      className="fixed bottom-[14px] left-1/2 z-50 flex -translate-x-1/2 gap-[2px] rounded-[24px] border-2 border-ink bg-ink p-[6px] shadow-[4px_4px_0_rgba(42,37,32,0.22)] md:hidden"
     >
       {ITEMS.map((it) => (
         <NavLink
