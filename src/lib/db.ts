@@ -141,23 +141,32 @@ export async function listBoardTasks(boardId: string): Promise<Page[]> {
   return listPages({ parent_id: boardId, type: 'task' });
 }
 
-/** Stage 1+2 focus heuristic: not done, not snoozed, surface continuity first then oldest. */
+/**
+ * Stage 1+2 focus heuristic: open tasks, not snoozed past now, recently-touched
+ * first then oldest. Snooze lives in properties.snoozed_until (jsonb), so we
+ * filter that client-side rather than fighting PostgREST.
+ */
 export async function nextFocusCandidates(limit = 8): Promise<Page[]> {
-  const nowIso = new Date().toISOString();
-  // Fetch tasks; sort client-side for the recently-updated-first rule.
   const { data, error } = await supabase
     .from('pages')
     .select(PAGE_COLS)
     .eq('type', 'task')
     .eq('archived', false)
     .is('completed_at', null)
-    .or(`snoozed_until.is.null,snoozed_until.lt.${nowIso}`, {
-      foreignTable: undefined,
-    })
-    .limit(50);
+    .limit(100);
   if (error) throw error;
-  const pages = (data ?? []) as Page[];
-  const dayAgo = Date.now() - 24 * 60 * 60 * 1000;
+
+  const now = Date.now();
+  const dayAgo = now - 24 * 60 * 60 * 1000;
+
+  const pages = ((data ?? []) as Page[]).filter((p) => {
+    const snoozedUntil =
+      (p.properties as { snoozed_until?: string } | undefined)?.snoozed_until;
+    if (!snoozedUntil) return true;
+    const t = Date.parse(snoozedUntil);
+    return Number.isNaN(t) || t <= now;
+  });
+
   pages.sort((a, b) => {
     const ar = new Date(a.updated_at).getTime() >= dayAgo ? 0 : 1;
     const br = new Date(b.updated_at).getTime() >= dayAgo ? 0 : 1;

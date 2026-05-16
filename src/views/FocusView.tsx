@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { formatDistanceToNowStrict } from 'date-fns';
 import BottomNav from '../components/ui/BottomNav';
@@ -10,8 +10,6 @@ import { getPage } from '../lib/db';
 import type { Page } from '../lib/types';
 import CaptureSheet from '../components/page/CaptureSheet';
 
-const RIBBON_DOT_COLORS = ['sky-deep', 'mint-deep', 'lavender-deep', 'peach-deep', 'butter-deep'] as const;
-
 function colorForParent(id: string | null | undefined): string {
   if (!id) return '#8db4c8';
   let h = 0;
@@ -22,7 +20,17 @@ function colorForParent(id: string | null | undefined): string {
 
 export default function FocusView() {
   const nav = useNavigate();
-  const { current, alternatives, skip, reload } = useFocusTask();
+  const {
+    current,
+    alternatives,
+    loading,
+    error,
+    totalCount,
+    skippedCount,
+    skip,
+    resetSkipped,
+    reload,
+  } = useFocusTask();
   const { wins, reload: reloadWins } = useWins();
   const [parents, setParents] = useState<Record<string, Page | null>>({});
   const [captureOpen, setCaptureOpen] = useState(false);
@@ -50,12 +58,6 @@ export default function FocusView() {
     if (current) nav(`/page/${current.id}`);
   }, [current, nav]);
 
-  const onCaptureSaved = (count: number) => {
-    if (count > 0) {
-      void reload();
-    }
-  };
-
   const hero = current
     ? {
         title: current.title || 'untitled task',
@@ -64,6 +66,12 @@ export default function FocusView() {
         preview: snippet(docToPlaintext(current.body), 100),
       }
     : null;
+
+  // Three "no current task" states:
+  //   - loading (briefly)
+  //   - errored (show error + retry)
+  //   - skipped them all (totalCount > 0 but all dismissed this session)
+  //   - genuinely empty (no tasks at all)
 
   return (
     <div className="min-h-[100dvh] pb-32 pt-3">
@@ -112,23 +120,46 @@ export default function FocusView() {
               ▶ open task
             </button>
             <button
-              onClick={() => {
-                skip(current.id);
-              }}
+              onClick={() => skip(current.id)}
               className="flex-1 rounded-[14px] border-2 border-ink bg-transparent px-3 py-3.5 text-[14px] font-semibold shadow-card active:translate-x-[1px] active:translate-y-[1px] active:shadow-[1px_1px_0_var(--ink)]"
             >
               ↻ not this
             </button>
           </div>
         </div>
+      ) : loading ? (
+        <LoadingState />
+      ) : error ? (
+        <ErrorState message={error} onRetry={() => void reload()} />
+      ) : skippedCount > 0 && totalCount > 0 ? (
+        <SkippedAllState
+          totalCount={totalCount}
+          skippedCount={skippedCount}
+          onReset={resetSkipped}
+          onAdd={() => setCaptureOpen(true)}
+          onBoards={() => nav('/boards')}
+        />
       ) : (
-        <EmptyState onAdd={() => setCaptureOpen(true)} />
+        <EmptyState
+          onAdd={() => setCaptureOpen(true)}
+          onBoards={() => nav('/boards')}
+        />
       )}
 
       {alternatives.length > 0 && (
         <div className="mx-3.5 mb-4">
-          <div className="px-1 pb-2 font-mono text-[12px] uppercase tracking-mono text-ink-soft">
-            ↳ or maybe…
+          <div className="flex items-baseline justify-between px-1 pb-2">
+            <span className="font-mono text-[12px] uppercase tracking-mono text-ink-soft">
+              ↳ or maybe…
+            </span>
+            {skippedCount > 0 && (
+              <button
+                onClick={resetSkipped}
+                className="font-mono text-[11px] uppercase tracking-mono text-ink-soft underline"
+              >
+                show {skippedCount} skipped
+              </button>
+            )}
           </div>
           {alternatives.map((p) => (
             <Link
@@ -182,7 +213,7 @@ export default function FocusView() {
         open={captureOpen}
         onClose={() => setCaptureOpen(false)}
         onSaved={(c) => {
-          onCaptureSaved(c);
+          if (c > 0) void reload();
           void reloadWins();
         }}
       />
@@ -197,16 +228,99 @@ function glyphFor(t: string) {
   return '★';
 }
 
-function EmptyState({ onAdd }: { onAdd: () => void }) {
+// ============================================================================
+// empty / loading / error / skipped-all states
+// ============================================================================
+
+function LoadingState() {
   return (
     <div className="mx-3.5 mb-4 rounded-[22px] border-2 border-dashed border-ink-faint bg-bg-soft px-5 py-9 text-center">
-      <p className="mb-2 font-serif text-[22px] italic text-ink-soft">nothing to focus on.</p>
-      <p className="mb-4 text-[13px] text-ink-soft">
-        you're either done or you haven't told me yet.
+      <p className="font-mono text-[12px] uppercase tracking-mono text-ink-soft">
+        loading…
       </p>
-      <button onClick={onAdd} className="btn btn-primary">+ add a task</button>
     </div>
   );
 }
 
-void RIBBON_DOT_COLORS;
+function ErrorState({
+  message,
+  onRetry,
+}: {
+  message: string;
+  onRetry: () => void;
+}) {
+  return (
+    <div className="mx-3.5 mb-4 rounded-[22px] border-2 border-rose-deep bg-rose/30 px-5 py-6 text-center">
+      <p className="mb-1 font-serif text-[20px] italic">something didn't load.</p>
+      <p className="mb-4 font-mono text-[11px] uppercase tracking-mono text-ink-soft">
+        {message.slice(0, 120)}
+      </p>
+      <button onClick={onRetry} className="btn btn-primary">
+        try again
+      </button>
+    </div>
+  );
+}
+
+function SkippedAllState({
+  totalCount,
+  skippedCount,
+  onReset,
+  onAdd,
+  onBoards,
+}: {
+  totalCount: number;
+  skippedCount: number;
+  onReset: () => void;
+  onAdd: () => void;
+  onBoards: () => void;
+}) {
+  return (
+    <div className="mx-3.5 mb-4 rounded-[22px] border-2 border-ink bg-bg-soft px-5 py-7 text-center shadow-card">
+      <p className="mb-1 font-serif text-[22px] italic">
+        skipped past all {totalCount}.
+      </p>
+      <p className="mb-4 text-[13px] text-ink-soft">
+        you brushed off everything this session. start fresh, add something new,
+        or browse the board.
+      </p>
+      <div className="flex flex-wrap justify-center gap-2">
+        <button onClick={onReset} className="btn btn-primary">
+          ↻ show all again
+        </button>
+        <button onClick={onAdd} className="btn">+ add a task</button>
+        <button onClick={onBoards} className="btn">▦ open board</button>
+      </div>
+      <p className="mt-3 font-mono text-[10px] uppercase tracking-mono text-ink-faint">
+        you skipped {skippedCount} in this session
+      </p>
+    </div>
+  );
+}
+
+function EmptyState({
+  onAdd,
+  onBoards,
+}: {
+  onAdd: () => void;
+  onBoards: () => void;
+}) {
+  return (
+    <div className="mx-3.5 mb-4 rounded-[22px] border-2 border-dashed border-ink-faint bg-bg-soft px-5 py-9 text-center">
+      <p className="mb-1 font-serif text-[22px] italic text-ink-soft">
+        nothing to focus on.
+      </p>
+      <p className="mb-5 text-[13px] text-ink-soft">
+        either you've finished everything or there's nothing on your board yet.
+      </p>
+      <div className="flex flex-wrap justify-center gap-2">
+        <button onClick={onAdd} className="btn btn-primary">
+          + add a task
+        </button>
+        <button onClick={onBoards} className="btn">
+          ▦ open board
+        </button>
+      </div>
+    </div>
+  );
+}
