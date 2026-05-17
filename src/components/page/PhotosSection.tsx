@@ -94,7 +94,6 @@ export default function PhotosSection({ pageId, openSignal = 0 }: Props) {
         ref={inputRef}
         type="file"
         accept="image/*"
-        capture="environment"
         onChange={onFileSelected}
         className="hidden"
       />
@@ -107,7 +106,6 @@ export default function PhotosSection({ pageId, openSignal = 0 }: Props) {
         ref={inputRef}
         type="file"
         accept="image/*"
-        capture="environment"
         onChange={onFileSelected}
         className="hidden"
       />
