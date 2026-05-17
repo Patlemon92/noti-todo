@@ -58,14 +58,29 @@ export interface CanvasTextBox {
   size: number;
 }
 
-export interface NoteCanvasData {
+export interface NotePage {
+  id: number;
+  text: string;
   strokes: CanvasStroke[];
-  text_boxes: CanvasTextBox[];
   template: 'blank' | 'dotted' | 'lined' | 'grid';
-  w: number;
-  h: number;
+  /** Captured at save time so the SVG overlay aligns with the textarea. */
+  w?: number;
+  h?: number;
+}
+
+export interface NoteCanvasData {
+  /** Multi-page notebook. Always has at least one page. */
+  pages?: NotePage[];
+  /** Pre-rendered SVG of the first page for the list-view thumbnail. */
   svg: string;
   next_id: number;
+
+  // ---- legacy single-page fields (pre-multipage). kept for migration. ----
+  strokes?: CanvasStroke[];
+  text_boxes?: CanvasTextBox[];
+  template?: 'blank' | 'dotted' | 'lined' | 'grid';
+  w?: number;
+  h?: number;
 }
 
 export interface NoteProperties {

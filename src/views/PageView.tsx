@@ -491,20 +491,14 @@ function migrateBodyToCanvas(page: Page | null): NoteCanvasData | undefined {
   const plain = docToPlaintext(page.body) || page.body_text || '';
   if (!plain.trim()) return undefined;
   return {
-    strokes: [],
-    text_boxes: [
+    pages: [
       {
         id: 1,
-        x: 24,
-        y: 24,
-        text: plain.slice(0, 2000),
-        color: '#2a2520',
-        size: 18,
+        text: plain.slice(0, 8000),
+        strokes: [],
+        template: 'lined',
       },
     ],
-    template: 'dotted',
-    w: 0,
-    h: 0,
     svg: '',
     next_id: 2,
   };
