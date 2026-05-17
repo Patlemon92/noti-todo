@@ -195,7 +195,7 @@ export default function NoteCanvas({ initial, onSave }: Props) {
     <div className="mb-4">
       {/* sticky slim toolbar */}
       <div className="sticky top-0 z-20 -mx-1 mb-4 px-1 backdrop-blur-sm">
-        <div className="mx-auto flex max-w-[820px] items-center gap-0.5 rounded-pill border border-ink/15 bg-bg/90 px-1.5 py-1 shadow-[0_2px_8px_rgba(42,37,32,0.06)]">
+        <div className="mx-auto flex max-w-[1200px] items-center gap-0.5 rounded-pill border border-ink/15 bg-bg/90 px-1.5 py-1 shadow-[0_2px_8px_rgba(42,37,32,0.06)]">
           <ToolIcon active={tool === 'text'} onClick={() => { setTool('text'); setShowSettings(false); }} label="text">
             T
           </ToolIcon>
@@ -300,7 +300,7 @@ export default function NoteCanvas({ initial, onSave }: Props) {
 
       {/* page stack */}
       <div className="px-3.5 sm:px-8">
-        <div className="mx-auto flex max-w-[820px] flex-col gap-6">
+        <div className="mx-auto flex max-w-[1200px] flex-col gap-6">
           {pages.map((page, i) => (
             <PageSheet
               key={page.id}
@@ -551,7 +551,7 @@ function PageSheet({
         onPointerUp={onPointerEnd}
         onPointerCancel={onPointerEnd}
         className={clsx(
-          'relative min-h-[460px] touch-none overflow-hidden rounded-[6px] border border-ink/15 bg-surface shadow-[0_8px_28px_rgba(42,37,32,0.10),0_2px_4px_rgba(42,37,32,0.06)]',
+          'relative min-h-[640px] touch-none overflow-hidden rounded-[6px] border border-ink/15 bg-surface shadow-[0_8px_28px_rgba(42,37,32,0.10),0_2px_4px_rgba(42,37,32,0.06)]',
           tool === 'eraser' && 'cursor-crosshair',
           tool === 'text' && 'cursor-text',
         )}
@@ -579,7 +579,7 @@ function PageSheet({
             fontFamily:
               '"Bricolage Grotesque", system-ui, -apple-system, sans-serif',
             caretColor: '#2a2520',
-            minHeight: '460px',
+            minHeight: '640px',
           }}
         />
 

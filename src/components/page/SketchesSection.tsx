@@ -6,6 +6,7 @@ import {
   createSketch,
   deleteSketch,
   listSketches,
+  updateSketch,
   type Sketch,
 } from '../../lib/sketches';
 
@@ -22,6 +23,7 @@ export default function SketchesSection({ pageId }: Props) {
   const [loading, setLoading] = useState(true);
   const [canvasOpen, setCanvasOpen] = useState(false);
   const [view, setView] = useState<Sketch | null>(null);
+  const [editing, setEditing] = useState<Sketch | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -38,13 +40,44 @@ export default function SketchesSection({ pageId }: Props) {
     void load();
   }, [load]);
 
-  async function onSave(
+  async function onSaveNew(
     svg: string,
     w: number,
     h: number,
     template: 'blank' | 'dotted' | 'lined' | 'grid',
+    raw: { strokes: any[]; text_boxes: any[]; next_id: number },
   ) {
-    await createSketch({ page_id: pageId, svg, w, h, template });
+    await createSketch({
+      page_id: pageId,
+      svg,
+      w,
+      h,
+      template,
+      strokes: raw.strokes,
+      text_boxes: raw.text_boxes,
+      next_id: raw.next_id,
+    });
+    await load();
+  }
+
+  async function onSaveEdit(
+    svg: string,
+    w: number,
+    h: number,
+    template: 'blank' | 'dotted' | 'lined' | 'grid',
+    raw: { strokes: any[]; text_boxes: any[]; next_id: number },
+  ) {
+    if (!editing) return;
+    await updateSketch(editing.id, {
+      svg,
+      w,
+      h,
+      template,
+      strokes: raw.strokes,
+      text_boxes: raw.text_boxes,
+      next_id: raw.next_id,
+    });
+    setEditing(null);
     await load();
   }
 
@@ -96,7 +129,22 @@ export default function SketchesSection({ pageId }: Props) {
       <SketchCanvas
         open={canvasOpen}
         onClose={() => setCanvasOpen(false)}
-        onSave={onSave}
+        onSave={onSaveNew}
+      />
+      <SketchCanvas
+        open={!!editing}
+        onClose={() => setEditing(null)}
+        initial={
+          editing
+            ? {
+                strokes: editing.payload?.strokes,
+                text_boxes: editing.payload?.text_boxes,
+                template: editing.payload?.template,
+                next_id: editing.payload?.next_id,
+              }
+            : undefined
+        }
+        onSave={onSaveEdit}
       />
 
       {view && (
@@ -104,6 +152,14 @@ export default function SketchesSection({ pageId }: Props) {
           sketch={view}
           onClose={() => setView(null)}
           onDelete={() => onRemove(view.id)}
+          onEdit={
+            view.payload?.strokes || view.payload?.text_boxes
+              ? () => {
+                  setEditing(view);
+                  setView(null);
+                }
+              : undefined
+          }
         />
       )}
     </div>
@@ -135,10 +191,12 @@ function SketchViewer({
   sketch,
   onClose,
   onDelete,
+  onEdit,
 }: {
   sketch: Sketch;
   onClose: () => void;
   onDelete: () => void;
+  onEdit?: () => void;
 }) {
   const w = sketch.payload?.w ?? 320;
   const h = sketch.payload?.h ?? 240;
@@ -156,6 +214,14 @@ function SketchViewer({
             {format(new Date(sketch.created_at), 'EEE d MMM · h:mma').toLowerCase()}
           </span>
           <div className="flex items-center gap-1.5">
+            {onEdit && (
+              <button
+                onClick={onEdit}
+                className="rounded-md border border-ink bg-peach px-2 py-1 font-mono text-[10px] uppercase tracking-mono text-ink"
+              >
+                ✎ edit
+              </button>
+            )}
             <button
               onClick={onDelete}
               className="rounded-md border border-rose-deep bg-rose/30 px-2 py-1 font-mono text-[10px] uppercase tracking-mono text-ink"

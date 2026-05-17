@@ -12,11 +12,18 @@ import type { PaperTemplate } from '../../lib/sketches';
 interface Props {
   open: boolean;
   onClose: () => void;
+  initial?: {
+    strokes?: Stroke[];
+    text_boxes?: TextBox[];
+    template?: PaperTemplate;
+    next_id?: number;
+  };
   onSave: (
     svg: string,
     w: number,
     h: number,
     template: PaperTemplate,
+    raw: { strokes: Stroke[]; text_boxes: TextBox[]; next_id: number },
   ) => Promise<void> | void;
 }
 
@@ -55,7 +62,7 @@ const TEMPLATES: Array<{ key: PaperTemplate; label: string }> = [
 // ============================================================================
 // component
 // ============================================================================
-export default function SketchCanvas({ open, onClose, onSave }: Props) {
+export default function SketchCanvas({ open, onClose, onSave, initial }: Props) {
   const [strokes, setStrokes] = useState<Stroke[]>([]);
   const [current, setCurrent] = useState<Stroke | null>(null);
   const [textBoxes, setTextBoxes] = useState<TextBox[]>([]);
@@ -74,6 +81,9 @@ export default function SketchCanvas({ open, onClose, onSave }: Props) {
   const surfaceRef = useRef<HTMLDivElement>(null);
   const [dims, setDims] = useState({ w: 0, h: 0 });
   const nextId = useRef(1);
+  // remember the initial data we hydrated with so the reset-on-open
+  // effect doesn't reload it after every save.
+  const hydratedRef = useRef(false);
 
   // measure canvas size
   useEffect(() => {
@@ -102,15 +112,21 @@ export default function SketchCanvas({ open, onClose, onSave }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  // reset state when reopened
+  // reset / hydrate state when reopened
   useEffect(() => {
     if (open) {
-      setStrokes([]);
+      setStrokes(initial?.strokes ?? []);
+      setTextBoxes(initial?.text_boxes ?? []);
+      setTemplate(initial?.template ?? 'dotted');
       setCurrent(null);
-      setTextBoxes([]);
       setEditingTextId(null);
       setShowTemplatePicker(false);
+      nextId.current = initial?.next_id ?? 1;
+      hydratedRef.current = true;
+    } else {
+      hydratedRef.current = false;
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   function relPoint(e: ReactPointerEvent<HTMLDivElement>): Pt {
@@ -272,7 +288,11 @@ export default function SketchCanvas({ open, onClose, onSave }: Props) {
     if (isEmpty || saving) return;
     setSaving(true);
     try {
-      await onSave(buildSvg(), dims.w, dims.h, template);
+      await onSave(buildSvg(), dims.w, dims.h, template, {
+        strokes,
+        text_boxes: textBoxes,
+        next_id: nextId.current,
+      });
       onClose();
     } finally {
       setSaving(false);

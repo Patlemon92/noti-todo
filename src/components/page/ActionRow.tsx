@@ -8,7 +8,8 @@ export type ActionKey =
   | 'page-link'
   | 'image'
   | 'snooze'
-  | 'delegate';
+  | 'delegate'
+  | 'canvas';
 
 interface Props {
   onAction: (key: ActionKey) => void;
@@ -16,6 +17,7 @@ interface Props {
 
 const PILLS: { key: ActionKey; label: string }[] = [
   { key: 'timer', label: 'add a timer' },
+  { key: 'canvas', label: 'add canvas' },
   { key: 'reminder', label: 'add reminder' },
   { key: 'link', label: 'add link' },
   { key: 'page-link', label: 'link a page' },
@@ -40,7 +42,8 @@ export default function ActionRow({ onAction }: Props) {
       key === 'timer' ||
       key === 'page-link' ||
       key === 'reminder' ||
-      key === 'snooze'
+      key === 'snooze' ||
+      key === 'canvas'
     ) {
       onAction(key);
       return;

@@ -22,6 +22,7 @@ import { supabase } from '../lib/supabase';
 import {
   addPageLink,
   completeTask,
+  createPage,
   deletePage,
   getPage,
   recordWin,
@@ -137,6 +138,15 @@ export default function PageView() {
     if (key === 'page-link') setPickerOpen(true);
     if (key === 'reminder') setReminderOpen(true);
     if (key === 'snooze') setSnoozeOpen(true);
+    if (key === 'canvas') {
+      if (!page) return;
+      const child = await createPage({
+        type: 'note',
+        title: page.title ? `notes — ${page.title.slice(0, 60)}` : '',
+        parent_id: page.id,
+      });
+      nav(`/page/${child.id}`);
+    }
   };
 
   const onPickPageToLink = async (target: Page) => {
@@ -263,7 +273,7 @@ export default function PageView() {
 
   return (
     <div className="min-h-[100dvh] animate-pageIn pb-24 pt-3">
-      <div className="view-mid">
+      <div className={isNote ? 'view-wide' : 'view-mid'}>
       {/* top bar */}
       <div className="flex items-center justify-between px-3.5 pb-3">
         <button
