@@ -20,7 +20,7 @@ interface Props {
   ) => Promise<void> | void;
 }
 
-type Tool = 'pen' | 'highlighter' | 'eraser';
+type Tool = 'pen' | 'highlighter' | 'eraser' | 'text';
 type Pt = [number, number, number]; // x, y, pressure
 type Stroke = {
   id: number;
@@ -29,11 +29,21 @@ type Stroke = {
   size: number;
   tool: 'pen' | 'highlighter';
 };
+type TextBox = {
+  id: number;
+  x: number;
+  y: number;
+  text: string;
+  color: string;
+  size: number;
+};
 
 const PEN_COLORS = ['#2a2520', '#e88562', '#7fb389', '#8db4c8', '#a896d4', '#e8c75f'];
 const HIGHLIGHTER_COLORS = ['#fbeb5b', '#a3e3a3', '#9dc6e8', '#f4a3a3', '#e3b8f5', '#ffb37b'];
+const TEXT_COLORS = PEN_COLORS;
 const PEN_SIZES = [2, 4, 7, 12];
 const HIGHLIGHTER_SIZES = [14, 22, 32];
+const TEXT_SIZES = [14, 18, 24, 32];
 
 const TEMPLATES: Array<{ key: PaperTemplate; label: string }> = [
   { key: 'blank', label: 'blank' },
@@ -48,11 +58,15 @@ const TEMPLATES: Array<{ key: PaperTemplate; label: string }> = [
 export default function SketchCanvas({ open, onClose, onSave }: Props) {
   const [strokes, setStrokes] = useState<Stroke[]>([]);
   const [current, setCurrent] = useState<Stroke | null>(null);
+  const [textBoxes, setTextBoxes] = useState<TextBox[]>([]);
+  const [editingTextId, setEditingTextId] = useState<number | null>(null);
   const [tool, setTool] = useState<Tool>('pen');
   const [penColor, setPenColor] = useState<string>('#2a2520');
   const [penSize, setPenSize] = useState<number>(4);
   const [hlColor, setHlColor] = useState<string>('#fbeb5b');
   const [hlSize, setHlSize] = useState<number>(22);
+  const [textColor, setTextColor] = useState<string>('#2a2520');
+  const [textSize, setTextSize] = useState<number>(18);
   const [template, setTemplate] = useState<PaperTemplate>('dotted');
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -93,6 +107,8 @@ export default function SketchCanvas({ open, onClose, onSave }: Props) {
     if (open) {
       setStrokes([]);
       setCurrent(null);
+      setTextBoxes([]);
+      setEditingTextId(null);
       setShowTemplatePicker(false);
     }
   }, [open]);
@@ -104,11 +120,22 @@ export default function SketchCanvas({ open, onClose, onSave }: Props) {
   }
 
   function eraseAt(p: [number, number]) {
+    // text boxes first (they're rendered as DOM, easier to remove)
+    setTextBoxes((cur) => {
+      for (let i = cur.length - 1; i >= 0; i--) {
+        const b = cur[i];
+        const tw = Math.max(40, b.text.length * b.size * 0.55);
+        const th = (b.text.split('\n').length || 1) * b.size * 1.3;
+        if (p[0] >= b.x && p[0] <= b.x + tw && p[1] >= b.y && p[1] <= b.y + th) {
+          return cur.filter((_, idx) => idx !== i);
+        }
+      }
+      return cur;
+    });
     setStrokes((cur) => {
-      // search topmost first
       for (let i = cur.length - 1; i >= 0; i--) {
         const s = cur[i];
-        const hitRadius = (s.size + 14) * (s.size + 14); // squared
+        const hitRadius = (s.size + 14) * (s.size + 14);
         for (const pt of s.points) {
           const dx = pt[0] - p[0];
           const dy = pt[1] - p[1];
@@ -131,6 +158,20 @@ export default function SketchCanvas({ open, onClose, onSave }: Props) {
       return;
     }
 
+    if (tool === 'text') {
+      // tap an empty spot to drop a new text box
+      const r = surfaceRef.current!.getBoundingClientRect();
+      const x = e.clientX - r.left;
+      const y = e.clientY - r.top;
+      const id = nextId.current++;
+      setTextBoxes((cur) => [
+        ...cur,
+        { id, x, y, text: '', color: textColor, size: textSize },
+      ]);
+      setEditingTextId(id);
+      return;
+    }
+
     const isHl = tool === 'highlighter';
     setCurrent({
       id: nextId.current++,
@@ -148,6 +189,7 @@ export default function SketchCanvas({ open, onClose, onSave }: Props) {
       eraseAt([e.clientX - r.left, e.clientY - r.top]);
       return;
     }
+    if (tool === 'text') return;
     if (!current) return;
     if (e.buttons === 0 && e.pointerType !== 'pen') return;
     setCurrent((c) => (c ? { ...c, points: [...c.points, relPoint(e)] } : c));
@@ -155,19 +197,37 @@ export default function SketchCanvas({ open, onClose, onSave }: Props) {
 
   function onPointerEnd(e: ReactPointerEvent<HTMLDivElement>) {
     (e.target as HTMLElement).releasePointerCapture?.(e.pointerId);
-    if (tool === 'eraser') return;
+    if (tool === 'eraser' || tool === 'text') return;
     if (!current) return;
     if (current.points.length > 1) setStrokes((s) => [...s, current]);
     setCurrent(null);
   }
 
   function undo() {
-    setStrokes((s) => s.slice(0, -1));
+    // undo the most recent action — either a stroke or a text box, whichever
+    // was added last. we don't track an explicit history so use timestamps via
+    // their position in the arrays + the rough heuristic that strokes are
+    // append-only.
+    if (textBoxes.length > 0 && strokes.length === 0) {
+      setTextBoxes((b) => b.slice(0, -1));
+      return;
+    }
+    if (strokes.length > 0 && textBoxes.length === 0) {
+      setStrokes((s) => s.slice(0, -1));
+      return;
+    }
+    if (strokes.length > 0) {
+      setStrokes((s) => s.slice(0, -1));
+    } else if (textBoxes.length > 0) {
+      setTextBoxes((b) => b.slice(0, -1));
+    }
   }
 
   function clear() {
     setStrokes([]);
+    setTextBoxes([]);
     setCurrent(null);
+    setEditingTextId(null);
   }
 
   const allStrokes = current ? [...strokes, current] : strokes;
@@ -176,7 +236,10 @@ export default function SketchCanvas({ open, onClose, onSave }: Props) {
     if (a.tool === b.tool) return 0;
     return a.tool === 'highlighter' ? -1 : 1;
   });
-  const isEmpty = strokes.length === 0 && !current;
+  const isEmpty =
+    strokes.length === 0 &&
+    !current &&
+    textBoxes.filter((b) => b.text.trim()).length === 0;
 
   const buildSvg = useCallback((): string => {
     const bg = buildPaperBgSvg(template, dims.w, dims.h);
@@ -190,8 +253,20 @@ export default function SketchCanvas({ open, onClose, onSave }: Props) {
       })
       .filter(Boolean)
       .join('');
-    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${dims.w} ${dims.h}" width="${dims.w}" height="${dims.h}">${bg}${paths}</svg>`;
-  }, [strokes, dims, template]);
+    const texts = textBoxes
+      .filter((b) => b.text.trim())
+      .map((b) => {
+        const lines = b.text.split('\n');
+        return lines
+          .map((line, i) => {
+            const baseline = b.y + b.size * 0.95 + i * b.size * 1.25;
+            return `<text x="${b.x.toFixed(2)}" y="${baseline.toFixed(2)}" font-family="'Bricolage Grotesque', sans-serif" font-size="${b.size}" fill="${b.color}">${escapeXml(line)}</text>`;
+          })
+          .join('');
+      })
+      .join('');
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${dims.w} ${dims.h}" width="${dims.w}" height="${dims.h}">${bg}${paths}${texts}</svg>`;
+  }, [strokes, textBoxes, dims, template]);
 
   async function handleSave() {
     if (isEmpty || saving) return;
@@ -206,10 +281,24 @@ export default function SketchCanvas({ open, onClose, onSave }: Props) {
 
   if (!open) return null;
 
-  const activeColor = tool === 'highlighter' ? hlColor : penColor;
-  const activeColors = tool === 'highlighter' ? HIGHLIGHTER_COLORS : PEN_COLORS;
-  const activeSize = tool === 'highlighter' ? hlSize : penSize;
-  const activeSizes = tool === 'highlighter' ? HIGHLIGHTER_SIZES : PEN_SIZES;
+  const activeColor =
+    tool === 'highlighter' ? hlColor : tool === 'text' ? textColor : penColor;
+  const activeColors =
+    tool === 'highlighter' ? HIGHLIGHTER_COLORS : tool === 'text' ? TEXT_COLORS : PEN_COLORS;
+  const activeSize =
+    tool === 'highlighter' ? hlSize : tool === 'text' ? textSize : penSize;
+  const activeSizes =
+    tool === 'highlighter' ? HIGHLIGHTER_SIZES : tool === 'text' ? TEXT_SIZES : PEN_SIZES;
+  function setActiveColor(c: string) {
+    if (tool === 'highlighter') setHlColor(c);
+    else if (tool === 'text') setTextColor(c);
+    else setPenColor(c);
+  }
+  function setActiveSize(s: number) {
+    if (tool === 'highlighter') setHlSize(s);
+    else if (tool === 'text') setTextSize(s);
+    else setPenSize(s);
+  }
 
   return (
     <div className="fixed inset-0 z-[140] flex flex-col bg-bg animate-fadeIn">
@@ -236,6 +325,9 @@ export default function SketchCanvas({ open, onClose, onSave }: Props) {
           </ToolBtn>
           <ToolBtn active={tool === 'eraser'} onClick={() => setTool('eraser')} label="eraser">
             ◌
+          </ToolBtn>
+          <ToolBtn active={tool === 'text'} onClick={() => setTool('text')} label="text">
+            T
           </ToolBtn>
         </div>
 
@@ -280,10 +372,57 @@ export default function SketchCanvas({ open, onClose, onSave }: Props) {
             );
           })}
         </svg>
+
+        {/* live text boxes — interactive only when text tool is active */}
+        {textBoxes.map((b) => (
+          <textarea
+            key={b.id}
+            value={b.text}
+            autoFocus={editingTextId === b.id}
+            onChange={(e) =>
+              setTextBoxes((cur) =>
+                cur.map((x) => (x.id === b.id ? { ...x, text: e.target.value } : x)),
+              )
+            }
+            onBlur={() => setEditingTextId((id) => (id === b.id ? null : id))}
+            onFocus={() => setEditingTextId(b.id)}
+            onClick={(e) => {
+              if (tool === 'text') {
+                e.stopPropagation();
+                setEditingTextId(b.id);
+              }
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') (e.target as HTMLTextAreaElement).blur();
+            }}
+            placeholder={editingTextId === b.id ? 'type…' : ''}
+            spellCheck={false}
+            className={clsx(
+              'absolute resize-none bg-transparent leading-snug outline-none',
+              tool === 'text' ? 'pointer-events-auto' : 'pointer-events-none',
+              editingTextId === b.id && 'rounded border border-dashed border-ink/40',
+            )}
+            style={{
+              left: b.x,
+              top: b.y,
+              color: b.color,
+              fontSize: b.size,
+              fontFamily: '"Bricolage Grotesque", system-ui, sans-serif',
+              minWidth: '40px',
+              minHeight: `${b.size * 1.4}px`,
+              padding: '0 2px',
+              caretColor: b.color,
+            }}
+            // auto-grow width to roughly fit content
+            cols={Math.max(8, b.text.split('\n').reduce((m, l) => Math.max(m, l.length), 0) + 1)}
+            rows={Math.max(1, b.text.split('\n').length)}
+          />
+        ))}
+
         {isEmpty && (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
             <p className="font-serif text-[20px] italic text-ink-faint">
-              draw with finger or apple pencil
+              {tool === 'text' ? 'tap to add text' : 'draw with finger or apple pencil'}
             </p>
           </div>
         )}
@@ -297,9 +436,7 @@ export default function SketchCanvas({ open, onClose, onSave }: Props) {
             {activeColors.map((c) => (
               <button
                 key={c}
-                onClick={() =>
-                  tool === 'highlighter' ? setHlColor(c) : setPenColor(c)
-                }
+                onClick={() => setActiveColor(c)}
                 aria-label={`color ${c}`}
                 className={clsx(
                   'h-7 w-7 rounded-full border-2 transition-transform',
@@ -314,7 +451,7 @@ export default function SketchCanvas({ open, onClose, onSave }: Props) {
           </div>
         ) : (
           <div className="font-mono text-[11px] uppercase tracking-mono text-ink-soft">
-            drag through ink to erase
+            drag through ink or text to erase
           </div>
         )}
 
@@ -324,26 +461,31 @@ export default function SketchCanvas({ open, onClose, onSave }: Props) {
             {activeSizes.map((s) => (
               <button
                 key={s}
-                onClick={() =>
-                  tool === 'highlighter' ? setHlSize(s) : setPenSize(s)
-                }
+                onClick={() => setActiveSize(s)}
                 aria-label={`size ${s}`}
                 className={clsx(
                   'flex h-7 w-7 items-center justify-center rounded-full border-2',
                   activeSize === s ? 'border-ink bg-bg' : 'border-ink/30',
                 )}
               >
-                <span
-                  className="block rounded-full"
-                  style={{
-                    width: Math.min(s + 2, 18),
-                    height: Math.min(s + 2, 18),
-                    background:
-                      tool === 'highlighter'
-                        ? `${activeColor}66`
-                        : activeColor,
-                  }}
-                />
+                {tool === 'text' ? (
+                  <span
+                    className="font-serif font-semibold leading-none"
+                    style={{ color: activeColor, fontSize: Math.min(s, 16) }}
+                  >
+                    T
+                  </span>
+                ) : (
+                  <span
+                    className="block rounded-full"
+                    style={{
+                      width: Math.min(s + 2, 18),
+                      height: Math.min(s + 2, 18),
+                      background:
+                        tool === 'highlighter' ? `${activeColor}66` : activeColor,
+                    }}
+                  />
+                )}
               </button>
             ))}
           </div>
@@ -467,6 +609,15 @@ function buildPaperBgSvg(template: PaperTemplate, w: number, h: number): string 
     return `<defs><pattern id="bgGrid" width="24" height="24" patternUnits="userSpaceOnUse"><path d="M 24 0 L 0 0 0 24" fill="none" stroke="rgba(42,37,32,0.18)" stroke-width="1"/></pattern></defs><rect width="${w}" height="${h}" fill="url(#bgGrid)"/>`;
   }
   return '';
+}
+
+function escapeXml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
 }
 
 function svgPathFromStroke(points: Pt[], size: number): string {
