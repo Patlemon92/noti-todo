@@ -41,9 +41,41 @@ export interface BoardProperties {
   columns?: BoardColumn[];
 }
 
+export interface CanvasStroke {
+  id: number;
+  points: [number, number, number][];
+  color: string;
+  size: number;
+  tool: 'pen' | 'highlighter';
+}
+
+export interface CanvasTextBox {
+  id: number;
+  x: number;
+  y: number;
+  text: string;
+  color: string;
+  size: number;
+}
+
+export interface NoteCanvasData {
+  strokes: CanvasStroke[];
+  text_boxes: CanvasTextBox[];
+  template: 'blank' | 'dotted' | 'lined' | 'grid';
+  w: number;
+  h: number;
+  svg: string;
+  next_id: number;
+}
+
+export interface NoteProperties {
+  canvas?: NoteCanvasData;
+}
+
 export type PageProperties =
   | TaskProperties
   | BoardProperties
+  | NoteProperties
   | Record<string, never>;
 
 // Tiptap stores docs as { type: 'doc', content: [...] }

@@ -16,6 +16,7 @@ import ReminderSheet from '../components/page/ReminderSheet';
 import RemindersStrip from '../components/page/RemindersStrip';
 import SnoozeSheet from '../components/page/SnoozeSheet';
 import SketchesSection from '../components/page/SketchesSection';
+import NoteCanvas from '../components/page/NoteCanvas';
 import IconButton from '../components/ui/IconButton';
 import { supabase } from '../lib/supabase';
 import {
@@ -28,6 +29,8 @@ import {
 } from '../lib/db';
 import type {
   ChecklistItem,
+  NoteCanvasData,
+  NoteProperties,
   Page,
   TaskProperties,
   TiptapDoc,
@@ -90,8 +93,11 @@ export default function PageView() {
   }, [page?.id]);
 
   const isTask = page?.type === 'task';
+  const isNote = page?.type === 'note';
   const taskProps = (page?.properties as TaskProperties | undefined) ?? {};
   const checklist: ChecklistItem[] = taskProps.checklist ?? [];
+  const noteProps = (page?.properties as NoteProperties | undefined) ?? {};
+  const initialNoteCanvas: NoteCanvasData | undefined = noteProps.canvas ?? migrateBodyToCanvas(page);
 
   const onTitleChange = (val: string) => {
     setTitleDraft(val);
@@ -319,19 +325,29 @@ export default function PageView() {
         </>
       )}
 
-      {/* body editor */}
-      <div className="mb-4 px-3.5">
-        <PageEditor
-          pageId={page.id}
-          initialBody={page.body}
-          onSave={onBodySave}
-          placeholder={
-            page.type === 'note'
-              ? 'capture the thought…'
-              : 'any notes, links, plans, anything…'
-          }
+      {/* body — canvas for notes, rich-text editor for everything else */}
+      {isNote ? (
+        <NoteCanvas
+          key={page.id}
+          initial={initialNoteCanvas}
+          onSave={async (data) => {
+            const nextProps = {
+              ...(page.properties as NoteProperties | undefined),
+              canvas: data,
+            };
+            await save({ properties: nextProps });
+          }}
         />
-      </div>
+      ) : (
+        <div className="mb-4 px-3.5">
+          <PageEditor
+            pageId={page.id}
+            initialBody={page.body}
+            onSave={onBodySave}
+            placeholder={'any notes, links, plans, anything…'}
+          />
+        </div>
+      )}
 
       {isTask && checklist.length > 0 && (
         <ChecklistSection items={checklist} onChange={onChecklistChange} />
@@ -361,7 +377,8 @@ export default function PageView() {
         </div>
       )}
 
-      <SketchesSection pageId={page.id} />
+      {/* sketches section: shown for everything except notes (notes ARE canvases) */}
+      {!isNote && <SketchesSection pageId={page.id} />}
 
       <ChildPages parentId={page.id} parentType={page.type} refreshKey={childrenVersion} />
       <Backlinks pageId={page.id} />
@@ -460,3 +477,35 @@ function TitleInput({
 // silence unused import warning if docToPlaintext/snippet end up not used here
 void docToPlaintext;
 void snippet;
+
+// ============================================================================
+// One-time migration from legacy Tiptap body → canvas text box.
+// Runs at first render when type='note' page has body content but no canvas
+// yet. The text content lands as a single text box at the top-left of the
+// canvas. The original body is left in place (we just stop displaying it).
+// ============================================================================
+function migrateBodyToCanvas(page: Page | null): NoteCanvasData | undefined {
+  if (!page || page.type !== 'note') return undefined;
+  const props = (page.properties as NoteProperties | undefined) ?? {};
+  if (props.canvas) return undefined;
+  const plain = docToPlaintext(page.body) || page.body_text || '';
+  if (!plain.trim()) return undefined;
+  return {
+    strokes: [],
+    text_boxes: [
+      {
+        id: 1,
+        x: 24,
+        y: 24,
+        text: plain.slice(0, 2000),
+        color: '#2a2520',
+        size: 18,
+      },
+    ],
+    template: 'dotted',
+    w: 0,
+    h: 0,
+    svg: '',
+    next_id: 2,
+  };
+}
