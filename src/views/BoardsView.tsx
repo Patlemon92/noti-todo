@@ -136,9 +136,10 @@ export default function BoardsView() {
   }, [active]);
 
   // ----- column model -----
-  const columns: BoardColumn[] =
-    (active?.properties as BoardProperties | undefined)?.columns ??
-    DEFAULT_BOARD_COLUMNS;
+  // explicitly-empty arrays count as 'no columns yet' for new boards.
+  // legacy boards with no columns prop at all still fall back to defaults.
+  const rawColumns = (active?.properties as BoardProperties | undefined)?.columns;
+  const columns: BoardColumn[] = rawColumns === undefined ? DEFAULT_BOARD_COLUMNS : rawColumns;
 
   const byColumn: Record<string, Page[]> = {};
   for (const col of columns) byColumn[col.id] = [];
@@ -297,12 +298,13 @@ export default function BoardsView() {
   async function createBoard(title: string) {
     const trimmed = title.trim();
     if (!trimmed) return;
+    // new boards start blank — user adds columns as needed
     const board = await createPage({
       type: 'board',
       title: trimmed,
       properties: {
         color: 'sky',
-        columns: DEFAULT_BOARD_COLUMNS.map((c, i) => ({ ...c, sort_order: i })),
+        columns: [],
       } as BoardProperties,
     });
     setBoards((cur) => [...cur, board]);
@@ -472,6 +474,18 @@ export default function BoardsView() {
             items={columns.map((c) => c.id)}
             strategy={horizontalListSortingStrategy}
           >
+            {columns.length === 0 && (
+              <div className="mx-3.5 mb-4 rounded-[14px] border-[1.5px] border-dashed border-ink-faint bg-bg-soft px-5 py-8 text-center">
+                <p className="mb-1 font-serif text-[18px] italic text-ink-soft">
+                  no columns yet.
+                </p>
+                <p className="mb-4 text-[13px] text-ink-soft">
+                  add a column below to start shaping this board. anything
+                  works — <em>today / doing / done</em>, <em>backlog / now / next</em>,
+                  or whatever fits your work.
+                </p>
+              </div>
+            )}
             <div className="flex gap-3 overflow-x-auto px-3.5 pb-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {columns.map((col) => (
                 <SortableColumn
@@ -526,7 +540,7 @@ export default function BoardsView() {
         open={switcher}
         onClose={() => setSwitcher(false)}
         title="boards"
-        subtitle="multi-board lands in stage 3. for now: rename inline below."
+        subtitle="pick one to switch · tap '+ new board' to start a blank one"
       >
         <div className="flex flex-col gap-1.5">
           {boards.map((b) => (
