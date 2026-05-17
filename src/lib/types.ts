@@ -68,6 +68,7 @@ export interface Page {
   created_at: string;
   updated_at: string;
   completed_at: string | null;
+  deleted_at?: string | null;
 }
 
 export interface PageLink {
@@ -88,7 +89,7 @@ export interface PageAction {
 export interface Win {
   id: string;
   user_id: string;
-  source_type: 'task_completed' | 'checklist_item' | 'session';
+  source_type: 'task_completed' | 'checklist_item' | 'session' | 'task_deleted';
   source_id: string;
   text: string;
   occurred_at: string;

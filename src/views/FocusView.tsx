@@ -252,6 +252,7 @@ export default function FocusView() {
 function glyphFor(t: string) {
   if (t === 'task_completed') return '✓';
   if (t === 'checklist_item') return '·';
+  if (t === 'task_deleted') return '✕';
   return '★';
 }
 

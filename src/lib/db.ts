@@ -11,7 +11,7 @@ import {
 } from './types';
 
 const PAGE_COLS =
-  'id,owner_id,parent_id,type,title,body,body_text,properties,sort_order,archived,created_at,updated_at,completed_at';
+  'id,owner_id,parent_id,type,title,body,body_text,properties,sort_order,archived,created_at,updated_at,completed_at,deleted_at';
 
 export async function getPage(id: string): Promise<Page | null> {
   const { data, error } = await supabase
@@ -27,11 +27,15 @@ export async function listPages(opts: {
   type?: PageType | PageType[];
   parent_id?: string | null;
   archived?: boolean;
+  /** When true, ONLY return soft-deleted pages (used by TrashView). Default false. */
+  trashOnly?: boolean;
   limit?: number;
 } = {}): Promise<Page[]> {
   let q = supabase.from('pages').select(PAGE_COLS);
   if (opts.archived === undefined) q = q.eq('archived', false);
   else q = q.eq('archived', opts.archived);
+  if (opts.trashOnly) q = q.not('deleted_at', 'is', null);
+  else q = q.is('deleted_at', null);
   if (opts.type) {
     if (Array.isArray(opts.type)) q = q.in('type', opts.type);
     else q = q.eq('type', opts.type);
@@ -54,6 +58,7 @@ export async function searchPagesByTitle(query: string, limit = 8): Promise<Page
       .from('pages')
       .select(PAGE_COLS)
       .eq('archived', false)
+      .is('deleted_at', null)
       .order('updated_at', { ascending: false })
       .limit(limit);
     if (error) throw error;
@@ -63,6 +68,7 @@ export async function searchPagesByTitle(query: string, limit = 8): Promise<Page
     .from('pages')
     .select(PAGE_COLS)
     .eq('archived', false)
+    .is('deleted_at', null)
     .ilike('title', `%${query}%`)
     .order('updated_at', { ascending: false })
     .limit(limit);
@@ -108,9 +114,56 @@ export async function updatePage(
   if (error) throw error;
 }
 
+/**
+ * Soft delete: marks deleted_at so the page disappears from listings but
+ * sits in /trash for 5 days. Logs a 'task_deleted' win for tasks so the
+ * letting-go shows up in 'today you did'. After 5 days a cron purges it.
+ */
 export async function deletePage(id: string): Promise<void> {
+  const page = await getPage(id);
+  if (!page) return;
+  const { error } = await supabase
+    .from('pages')
+    .update({ deleted_at: new Date().toISOString() })
+    .eq('id', id);
+  if (error) throw error;
+  if (page.type === 'task' && page.title?.trim()) {
+    try {
+      await recordWin({
+        source_type: 'task_deleted',
+        source_id: id,
+        text: page.title.trim(),
+      });
+    } catch {
+      // wins are nice-to-have; never block the delete
+    }
+  }
+}
+
+/** Restore from trash. */
+export async function restorePage(id: string): Promise<void> {
+  const { error } = await supabase
+    .from('pages')
+    .update({ deleted_at: null })
+    .eq('id', id);
+  if (error) throw error;
+}
+
+/** Hard delete — bypasses the 5-day grace. Use from TrashView only. */
+export async function permanentlyDeletePage(id: string): Promise<void> {
   const { error } = await supabase.from('pages').delete().eq('id', id);
   if (error) throw error;
+}
+
+export async function listTrash(): Promise<Page[]> {
+  const { data, error } = await supabase
+    .from('pages')
+    .select(PAGE_COLS)
+    .not('deleted_at', 'is', null)
+    .order('deleted_at', { ascending: false })
+    .limit(200);
+  if (error) throw error;
+  return (data ?? []) as Page[];
 }
 
 export async function listChildPages(parentId: string): Promise<Page[]> {
@@ -153,6 +206,7 @@ export async function nextFocusCandidates(limit = 8): Promise<Page[]> {
     .eq('type', 'task')
     .eq('archived', false)
     .is('completed_at', null)
+    .is('deleted_at', null)
     .limit(100);
   if (error) throw error;
 
@@ -231,6 +285,7 @@ export async function listCompletedTasks(limit = 200): Promise<Page[]> {
     .select(PAGE_COLS)
     .eq('type', 'task')
     .not('completed_at', 'is', null)
+    .is('deleted_at', null)
     .order('completed_at', { ascending: false })
     .limit(limit);
   if (error) throw error;

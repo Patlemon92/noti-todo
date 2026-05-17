@@ -8,6 +8,7 @@ import BoardsView from './views/BoardsView';
 import NotesView from './views/NotesView';
 import ProfileView from './views/ProfileView';
 import DoneView from './views/DoneView';
+import TrashView from './views/TrashView';
 import InstallPrompt from './pwa/InstallPrompt';
 import Sidebar from './components/ui/Sidebar';
 import CommandPalette from './components/cmd/CommandPalette';
@@ -90,6 +91,14 @@ export default function App() {
             element={
               <Protected>
                 <DoneView />
+              </Protected>
+            }
+          />
+          <Route
+            path="/trash"
+            element={
+              <Protected>
+                <TrashView />
               </Protected>
             }
           />

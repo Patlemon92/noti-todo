@@ -25,6 +25,7 @@ const NAV_TARGETS: Array<{ to: string; label: string; icon: string }> = [
   { to: '/boards', label: 'boards', icon: '▦' },
   { to: '/notes', label: 'notes', icon: '✎' },
   { to: '/done', label: 'done', icon: '✓' },
+  { to: '/trash', label: 'trash', icon: '✕' },
   { to: '/profile', label: 'you', icon: '◉' },
 ];
 

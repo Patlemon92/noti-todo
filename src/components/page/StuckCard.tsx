@@ -4,21 +4,25 @@ import { aiAsk, aiStuck } from '../../lib/ai';
 
 interface Props {
   pageId: string;
+  /** Adds the shown response to the current task's checklist. Only used for action mode. */
+  onAddToChecklist?: (text: string) => Promise<void> | void;
 }
 
 type Mode = 'action' | 'question';
 type Status = 'idle' | 'loading' | 'shown' | 'error';
 
-export default function StuckCard({ pageId }: Props) {
+export default function StuckCard({ pageId, onAddToChecklist }: Props) {
   const [status, setStatus] = useState<Status>('idle');
   const [mode, setMode] = useState<Mode | null>(null);
   const [response, setResponse] = useState<string | null>(null);
   const [errMsg, setErrMsg] = useState<string | null>(null);
+  const [added, setAdded] = useState(false);
 
   async function run(next: Mode) {
     setMode(next);
     setStatus('loading');
     setErrMsg(null);
+    setAdded(false);
     try {
       const r = next === 'action' ? await aiStuck(pageId) : await aiAsk(pageId);
       // eslint-disable-next-line no-console
@@ -106,12 +110,32 @@ export default function StuckCard({ pageId }: Props) {
         {isQuestion ? '✦ a question' : '✦ try this'}
       </div>
       <p className="text-[14px] leading-snug">{response}</p>
+      {!isQuestion && onAddToChecklist && response && (
+        <div className="mt-2.5">
+          <button
+            onClick={async () => {
+              if (added) return;
+              await onAddToChecklist(response);
+              setAdded(true);
+            }}
+            disabled={added}
+            className={clsx(
+              'inline-flex items-center gap-1.5 rounded-pill border-[1.5px] border-ink bg-surface px-3 py-1 text-[12px] font-medium shadow-card-sm transition-all',
+              added && 'bg-mint',
+            )}
+          >
+            <span className="text-coral">{added ? '✓' : '+'}</span>
+            {added ? 'added to checklist' : 'add to checklist'}
+          </button>
+        </div>
+      )}
       <div className="mt-2 flex flex-wrap gap-3 text-[11px]">
         <button
           onClick={() => {
             setStatus('idle');
             setMode(null);
             setResponse(null);
+            setAdded(false);
           }}
           className="font-mono uppercase tracking-mono text-ink-soft underline"
         >

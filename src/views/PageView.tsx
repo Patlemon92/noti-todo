@@ -295,7 +295,16 @@ export default function PageView() {
               onStop={() => setActiveTimer(null)}
             />
           )}
-          <StuckCard pageId={page.id} />
+          <StuckCard
+            pageId={page.id}
+            onAddToChecklist={async (text) => {
+              const next: ChecklistItem[] = [
+                ...checklist,
+                { id: makeId(), text, done: false },
+              ];
+              await save({ properties: { ...taskProps, checklist: next } });
+            }}
+          />
           {checklist.length === 0 && (
             <div className="mx-3.5 mb-3">
               <button

@@ -28,7 +28,7 @@ interface ReminderRow {
     sent_at?: string | null;
     dismissed_at?: string | null;
   };
-  pages?: { id: string; title: string; owner_id: string };
+  pages?: { id: string; title: string; owner_id: string; deleted_at: string | null };
 }
 
 interface Subscription {
@@ -73,8 +73,9 @@ Deno.serve(async (req) => {
   const nowIso = new Date().toISOString();
   const { data: rows, error } = await admin
     .from('page_actions')
-    .select('id, page_id, payload, pages!inner(id,title,owner_id)')
+    .select('id, page_id, payload, pages!inner(id,title,owner_id,deleted_at)')
     .eq('type', 'reminder')
+    .is('pages.deleted_at', null)
     .lte('payload->>due_at', nowIso)
     .limit(200);
   if (error) {
