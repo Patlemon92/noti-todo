@@ -71,7 +71,7 @@ export default function FocusView() {
   return (
     <div className="min-h-[100dvh] pb-32 pt-3">
       <div className="view-narrow">
-        <TopStrip onAdd={() => setAddOpen(true)} />
+        <TopStrip onAdd={() => setAddOpen(true)} onProgress={() => void reload()} />
 
         {/* today chip — quiet, only visible after at least one win today */}
         {doneToday !== null && doneToday > 0 && (

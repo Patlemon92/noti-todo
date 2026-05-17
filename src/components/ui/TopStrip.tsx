@@ -18,8 +18,8 @@ export default function TopStrip({ onAdd, onProgress, right = 'default' }: Props
       {right === 'default' && (
         <div className="flex gap-1.5">
           {onProgress && (
-            <IconButton aria-label="progress" onClick={onProgress}>
-              ▲
+            <IconButton aria-label="refresh" title="refresh" onClick={onProgress}>
+              ↻
             </IconButton>
           )}
           {onAdd && (

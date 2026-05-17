@@ -29,6 +29,20 @@ export function useFocusTask() {
     void reload();
   }, [reload]);
 
+  // refresh when the tab regains visibility (catches tasks added in another
+  // tab or while the app was backgrounded)
+  useEffect(() => {
+    function onVis() {
+      if (document.visibilityState === 'visible') void reload();
+    }
+    document.addEventListener('visibilitychange', onVis);
+    window.addEventListener('focus', onVis);
+    return () => {
+      document.removeEventListener('visibilitychange', onVis);
+      window.removeEventListener('focus', onVis);
+    };
+  }, [reload]);
+
   const visible = useMemo(
     () => candidates.filter((p) => !dismissed.has(p.id)),
     [candidates, dismissed],
