@@ -96,6 +96,18 @@ export default function BoardsView() {
   // global add sheet
   const [addOpen, setAddOpen] = useState(false);
 
+  // desktop rail collapse state — persisted across reloads
+  const [railCollapsed, setRailCollapsed] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem('noti-todo:board-rail-collapsed') === '1';
+  });
+  useEffect(() => {
+    localStorage.setItem(
+      'noti-todo:board-rail-collapsed',
+      railCollapsed ? '1' : '0',
+    );
+  }, [railCollapsed]);
+
   // ----- loaders -----
   async function loadBoards() {
     let list = await listBoards();
@@ -378,18 +390,33 @@ export default function BoardsView() {
   return (
     <div className="min-h-[100dvh] pb-32 pt-3">
       <div className="md:flex md:items-start md:gap-0">
-      <BoardRail
-        boards={boards}
-        activeId={active?.id ?? null}
-        onPick={(id) => {
-          const b = boards.find((x) => x.id === id);
-          if (b) setActive(b);
-        }}
-        onCreate={createBoard}
-      />
+      {!railCollapsed && (
+        <BoardRail
+          boards={boards}
+          activeId={active?.id ?? null}
+          onPick={(id) => {
+            const b = boards.find((x) => x.id === id);
+            if (b) setActive(b);
+          }}
+          onCreate={createBoard}
+          onCollapse={() => setRailCollapsed(true)}
+        />
+      )}
       <div className="md:min-w-0 md:flex-1">
       <div className="view-wide">
       <TopStrip onAdd={() => setAddOpen(true)} />
+
+      {railCollapsed && (
+        <div className="hidden px-3.5 pb-2 md:block">
+          <button
+            onClick={() => setRailCollapsed(false)}
+            title="show boards"
+            className="inline-flex items-center gap-1.5 rounded-pill border-[1.5px] border-ink-faint bg-surface px-2.5 py-1 font-mono text-[11px] uppercase tracking-mono text-ink-soft shadow-card-sm hover:border-ink hover:text-ink"
+          >
+            <span className="font-mono">›</span> boards
+          </button>
+        </div>
+      )}
 
       {/* board title — click to edit, ▾ opens switcher (mobile only) */}
       <div className="flex items-center justify-between gap-2 px-3.5 pb-3">
@@ -614,11 +641,13 @@ function BoardRail({
   activeId,
   onPick,
   onCreate,
+  onCollapse,
 }: {
   boards: Page[];
   activeId: string | null;
   onPick: (id: string) => void;
   onCreate: (title: string) => void | Promise<void>;
+  onCollapse: () => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
@@ -636,8 +665,18 @@ function BoardRail({
 
   return (
     <aside className="hidden md:flex md:w-[260px] md:flex-shrink-0 md:flex-col md:gap-1 md:border-r md:border-ink/15 md:px-3 md:pt-12 md:pb-6">
-      <div className="px-1 pb-2 font-mono text-[11px] uppercase tracking-mono-wide text-ink-soft">
-        boards
+      <div className="flex items-center justify-between px-1 pb-2">
+        <span className="font-mono text-[11px] uppercase tracking-mono-wide text-ink-soft">
+          boards
+        </span>
+        <button
+          onClick={onCollapse}
+          title="collapse boards"
+          aria-label="collapse boards"
+          className="flex h-5 w-5 items-center justify-center rounded-md font-mono text-[12px] text-ink-soft hover:bg-bg-soft hover:text-ink"
+        >
+          ‹
+        </button>
       </div>
       {boards.map((b) => (
         <button
