@@ -7,10 +7,13 @@ import { supabase } from './supabase';
 //     h: number       — natural height
 //   }
 
+export type PaperTemplate = 'blank' | 'dotted' | 'lined' | 'grid';
+
 export interface SketchPayload {
   svg: string;
   w: number;
   h: number;
+  template?: PaperTemplate;
 }
 
 export interface Sketch {
@@ -25,13 +28,19 @@ export async function createSketch(input: {
   svg: string;
   w: number;
   h: number;
+  template?: PaperTemplate;
 }): Promise<Sketch> {
   const { data, error } = await supabase
     .from('page_actions')
     .insert({
       page_id: input.page_id,
       type: 'sketch',
-      payload: { svg: input.svg, w: input.w, h: input.h } satisfies SketchPayload,
+      payload: {
+        svg: input.svg,
+        w: input.w,
+        h: input.h,
+        template: input.template,
+      } satisfies SketchPayload,
     })
     .select('*')
     .single();

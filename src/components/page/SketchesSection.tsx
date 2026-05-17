@@ -38,8 +38,13 @@ export default function SketchesSection({ pageId }: Props) {
     void load();
   }, [load]);
 
-  async function onSave(svg: string, w: number, h: number) {
-    await createSketch({ page_id: pageId, svg, w, h });
+  async function onSave(
+    svg: string,
+    w: number,
+    h: number,
+    template: 'blank' | 'dotted' | 'lined' | 'grid',
+  ) {
+    await createSketch({ page_id: pageId, svg, w, h, template });
     await load();
   }
 
