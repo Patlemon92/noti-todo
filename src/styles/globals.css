@@ -348,3 +348,12 @@
   margin-left: auto;
   margin-right: auto;
 }
+
+/* Note fullscreen mode — hide the desktop sidebar, drop the main margin so
+ * the canvas can use the whole viewport (matches goodnotes on iPad PWA). */
+body.note-fullscreen [data-shell="sidebar"] {
+  display: none !important;
+}
+body.note-fullscreen main {
+  margin-left: 0 !important;
+}

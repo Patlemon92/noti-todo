@@ -18,6 +18,7 @@ export default function Sidebar() {
   const cmd = useCommandPalette();
   return (
     <nav
+      data-shell="sidebar"
       aria-label="primary"
       className="fixed inset-y-0 left-0 z-40 hidden w-[64px] flex-col items-center justify-between border-r-2 border-ink bg-bg/95 py-5 md:flex"
     >

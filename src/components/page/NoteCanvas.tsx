@@ -13,13 +13,14 @@ import {
 import { getStroke } from 'perfect-freehand';
 import clsx from 'clsx';
 import type {
+  CanvasImage,
   CanvasStroke as Stroke,
   CanvasTextBox,
   NoteCanvasData,
   NotePage,
 } from '../../lib/types';
 
-type Tool = 'pen' | 'highlighter' | 'eraser' | 'text';
+type Tool = 'pen' | 'highlighter' | 'eraser' | 'text' | 'lasso';
 type Template = 'blank' | 'dotted' | 'lined' | 'grid';
 type Pt = [number, number, number];
 
@@ -89,6 +90,84 @@ export default function NoteCanvas({ initial, onSave }: Props) {
     setPages((cur) => cur.map((p) => (p.id === id ? { ...p, ...patch } : p)));
   }
 
+  function nextStrokeId(): number {
+    return nextIdRef.current++;
+  }
+
+  // ----- image insert -----
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  function onPickImage() {
+    imageInputRef.current?.click();
+  }
+  function readAndPlaceImage(file: File, pageId?: number) {
+    if (!file.type.startsWith('image/')) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      const img = new Image();
+      img.onload = () => {
+        // scale so longest side <= 500 (UI footprint, not file size)
+        const max = 500;
+        const ratio = img.width > img.height ? max / img.width : max / img.height;
+        const w = Math.round(img.width * ratio);
+        const h = Math.round(img.height * ratio);
+        const newImg: CanvasImage = {
+          id: nextStrokeId(),
+          x: 40,
+          y: 40,
+          w,
+          h,
+          src: dataUrl,
+        };
+        const target = pageId ?? pages[0]?.id;
+        if (target === undefined) return;
+        setPages((cur) =>
+          cur.map((p) =>
+            p.id === target ? { ...p, images: [...(p.images ?? []), newImg] } : p,
+          ),
+        );
+      };
+      img.src = dataUrl;
+    };
+    reader.readAsDataURL(file);
+  }
+  function onImageFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (file) readAndPlaceImage(file);
+    if (e.target) e.target.value = ''; // allow re-selecting the same file
+  }
+
+  // paste handler — when canvas is interacted with, pasting an image inserts it
+  useEffect(() => {
+    function onPaste(e: ClipboardEvent) {
+      if (!e.clipboardData) return;
+      // ignore paste inside any focused input/textarea (let them get the text)
+      const active = document.activeElement as HTMLElement | null;
+      if (
+        active &&
+        (active.tagName === 'INPUT' ||
+          active.tagName === 'TEXTAREA' ||
+          active.isContentEditable)
+      ) {
+        return;
+      }
+      const items = Array.from(e.clipboardData.items);
+      for (const it of items) {
+        if (it.type.startsWith('image/')) {
+          const file = it.getAsFile();
+          if (file) {
+            readAndPlaceImage(file);
+            e.preventDefault();
+            return;
+          }
+        }
+      }
+    }
+    document.addEventListener('paste', onPaste);
+    return () => document.removeEventListener('paste', onPaste);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pages.length]);
+
   function addPage(afterId?: number) {
     setPages((cur) => {
       const newPage: NotePage = {
@@ -135,11 +214,18 @@ export default function NoteCanvas({ initial, onSave }: Props) {
       })
       .filter(Boolean)
       .join('');
+    // images render below ink in the preview
+    const imageEls = (first.images ?? [])
+      .map(
+        (im) =>
+          `<image href="${im.src}" x="${im.x}" y="${im.y}" width="${im.w}" height="${im.h}" />`,
+      )
+      .join('');
     // preview also includes a snippet of the typed text so thumbnails read at-a-glance
     const textPreview = first.text
       ? `<text x="40" y="${40 + 18}" font-family="'Bricolage Grotesque', sans-serif" font-size="18" fill="#2a2520">${escapeXml(first.text.split('\n')[0] ?? '').slice(0, 64)}</text>`
       : '';
-    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">${bg}${paths}${textPreview}</svg>`;
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">${bg}${imageEls}${paths}${textPreview}</svg>`;
   }, [pages]);
 
   useEffect(() => {
@@ -186,16 +272,11 @@ export default function NoteCanvas({ initial, onSave }: Props) {
     else setPenSize(s);
   }
 
-  function nextStrokeId(): number {
-    const id = nextIdRef.current++;
-    return id;
-  }
-
   return (
     <div className="mb-4">
       {/* sticky slim toolbar */}
       <div className="sticky top-0 z-20 -mx-1 mb-4 px-1 backdrop-blur-sm">
-        <div className="mx-auto flex max-w-[1200px] items-center gap-0.5 rounded-pill border border-ink/15 bg-bg/90 px-1.5 py-1 shadow-[0_2px_8px_rgba(42,37,32,0.06)]">
+        <div className="mx-auto flex max-w-[1500px] items-center gap-0.5 rounded-pill border border-ink/15 bg-bg/90 px-1.5 py-1 shadow-[0_2px_8px_rgba(42,37,32,0.06)]">
           <ToolIcon active={tool === 'text'} onClick={() => { setTool('text'); setShowSettings(false); }} label="text">
             T
           </ToolIcon>
@@ -208,6 +289,19 @@ export default function NoteCanvas({ initial, onSave }: Props) {
           <ToolIcon active={tool === 'eraser'} onClick={() => { setTool('eraser'); setShowSettings(false); }} label="eraser">
             ◌
           </ToolIcon>
+          <ToolIcon active={tool === 'lasso'} onClick={() => { setTool('lasso'); setShowSettings(false); }} label="lasso">
+            ⌖
+          </ToolIcon>
+          <ToolIcon onClick={onPickImage} label="insert image">
+            🖼
+          </ToolIcon>
+          <input
+            ref={imageInputRef}
+            type="file"
+            accept="image/*"
+            onChange={onImageFileChange}
+            className="hidden"
+          />
 
           {(tool === 'pen' || tool === 'highlighter') && (
             <div className="relative ml-1">
@@ -300,7 +394,7 @@ export default function NoteCanvas({ initial, onSave }: Props) {
 
       {/* page stack */}
       <div className="px-3.5 sm:px-8">
-        <div className="mx-auto flex max-w-[1200px] flex-col gap-6">
+        <div className="mx-auto flex max-w-[1500px] flex-col gap-6">
           {pages.map((page, i) => (
             <PageSheet
               key={page.id}
@@ -314,6 +408,7 @@ export default function NoteCanvas({ initial, onSave }: Props) {
               hlSize={hlSize}
               onTextChange={(text) => patchPage(page.id, { text })}
               onStrokesChange={(strokes) => patchPage(page.id, { strokes })}
+              onImagesChange={(images) => patchPage(page.id, { images })}
               onTemplateChange={(template) => patchPage(page.id, { template })}
               onDimsChange={(w, h) => patchPage(page.id, { w, h })}
               onRemove={() => removePage(page.id)}
@@ -348,6 +443,7 @@ interface PageSheetProps {
   hlSize: number;
   onTextChange: (text: string) => void;
   onStrokesChange: (strokes: Stroke[]) => void;
+  onImagesChange: (images: CanvasImage[]) => void;
   onTemplateChange: (template: Template) => void;
   onDimsChange: (w: number, h: number) => void;
   onRemove: () => void;
@@ -366,6 +462,7 @@ function PageSheet({
   hlSize,
   onTextChange,
   onStrokesChange,
+  onImagesChange,
   onTemplateChange,
   onDimsChange,
   onRemove,
@@ -411,9 +508,21 @@ function PageSheet({
   function eraseAt(p: [number, number]) {
     // Pixel eraser: split each stroke at points within the eraser radius
     // instead of removing the whole stroke. Each contiguous run of surviving
-    // points becomes its own sub-stroke (with a new id).
+    // points becomes its own sub-stroke (with a new id). Also removes any
+    // image whose bounding box the eraser is over.
     const ERASER_RADIUS = 16;
     const r2 = ERASER_RADIUS * ERASER_RADIUS;
+
+    // images first (bounding-box hit)
+    const imgs = page.images ?? [];
+    for (let i = imgs.length - 1; i >= 0; i--) {
+      const im = imgs[i];
+      if (p[0] >= im.x && p[0] <= im.x + im.w && p[1] >= im.y && p[1] <= im.y + im.h) {
+        onImagesChange(imgs.filter((_, idx) => idx !== i));
+        return;
+      }
+    }
+
     const next: Stroke[] = [];
     let anyChanged = false;
     for (const stroke of page.strokes) {
@@ -444,14 +553,130 @@ function PageSheet({
     if (anyChanged) onStrokesChange(next);
   }
 
+  // ----- lasso selection -----
+  const [lassoPoints, setLassoPoints] = useState<Array<[number, number]>>([]);
+  const [selectedStrokeIds, setSelectedStrokeIds] = useState<Set<number>>(new Set());
+  const [selectedImageIds, setSelectedImageIds] = useState<Set<number>>(new Set());
+  const [dragStart, setDragStart] = useState<[number, number] | null>(null);
+
+  function pointInPolygon(point: [number, number], polygon: Array<[number, number]>): boolean {
+    let inside = false;
+    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+      const xi = polygon[i][0], yi = polygon[i][1];
+      const xj = polygon[j][0], yj = polygon[j][1];
+      const intersect =
+        yi > point[1] !== yj > point[1] &&
+        point[0] < ((xj - xi) * (point[1] - yi)) / (yj - yi) + xi;
+      if (intersect) inside = !inside;
+    }
+    return inside;
+  }
+
+  function finishLasso() {
+    if (lassoPoints.length < 3) {
+      setLassoPoints([]);
+      return;
+    }
+    const strokeIds = new Set<number>();
+    for (const stroke of page.strokes) {
+      // count points inside polygon — select if majority is inside
+      let inside = 0;
+      for (const pt of stroke.points) {
+        if (pointInPolygon([pt[0], pt[1]], lassoPoints)) inside++;
+      }
+      if (inside > stroke.points.length / 2) strokeIds.add(stroke.id);
+    }
+    const imageIds = new Set<number>();
+    for (const im of page.images ?? []) {
+      const cx = im.x + im.w / 2;
+      const cy = im.y + im.h / 2;
+      if (pointInPolygon([cx, cy], lassoPoints)) imageIds.add(im.id);
+    }
+    setSelectedStrokeIds(strokeIds);
+    setSelectedImageIds(imageIds);
+    setLassoPoints([]);
+  }
+
+  function clearSelection() {
+    setSelectedStrokeIds(new Set());
+    setSelectedImageIds(new Set());
+  }
+
+  function deleteSelection() {
+    if (selectedStrokeIds.size > 0) {
+      onStrokesChange(page.strokes.filter((s) => !selectedStrokeIds.has(s.id)));
+    }
+    if (selectedImageIds.size > 0) {
+      onImagesChange((page.images ?? []).filter((im) => !selectedImageIds.has(im.id)));
+    }
+    clearSelection();
+  }
+
+  // selection bounding box (in canvas coords)
+  function selectionBbox(): { x: number; y: number; w: number; h: number } | null {
+    if (selectedStrokeIds.size === 0 && selectedImageIds.size === 0) return null;
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const s of page.strokes) {
+      if (!selectedStrokeIds.has(s.id)) continue;
+      for (const [x, y] of s.points) {
+        if (x < minX) minX = x;
+        if (y < minY) minY = y;
+        if (x > maxX) maxX = x;
+        if (y > maxY) maxY = y;
+      }
+    }
+    for (const im of page.images ?? []) {
+      if (!selectedImageIds.has(im.id)) continue;
+      if (im.x < minX) minX = im.x;
+      if (im.y < minY) minY = im.y;
+      if (im.x + im.w > maxX) maxX = im.x + im.w;
+      if (im.y + im.h > maxY) maxY = im.y + im.h;
+    }
+    if (minX === Infinity) return null;
+    return { x: minX - 4, y: minY - 4, w: maxX - minX + 8, h: maxY - minY + 8 };
+  }
+
+  function moveSelection(dx: number, dy: number) {
+    if (selectedStrokeIds.size > 0) {
+      onStrokesChange(
+        page.strokes.map((s) =>
+          selectedStrokeIds.has(s.id)
+            ? { ...s, points: s.points.map(([x, y, p]): Pt => [x + dx, y + dy, p]) }
+            : s,
+        ),
+      );
+    }
+    if (selectedImageIds.size > 0) {
+      onImagesChange(
+        (page.images ?? []).map((im) =>
+          selectedImageIds.has(im.id) ? { ...im, x: im.x + dx, y: im.y + dy } : im,
+        ),
+      );
+    }
+  }
+
   function onPointerDown(e: ReactPointerEvent<HTMLDivElement>) {
     if (tool === 'text') return; // textarea handles its own pointers
     if (e.button !== 0 && e.pointerType !== 'pen' && e.pointerType !== 'touch') return;
     (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+    const r = surfaceRef.current!.getBoundingClientRect();
+    const p: [number, number] = [e.clientX - r.left, e.clientY - r.top];
 
     if (tool === 'eraser') {
-      const r = surfaceRef.current!.getBoundingClientRect();
-      eraseAt([e.clientX - r.left, e.clientY - r.top]);
+      eraseAt(p);
+      return;
+    }
+
+    if (tool === 'lasso') {
+      const bbox = selectionBbox();
+      if (bbox && p[0] >= bbox.x && p[0] <= bbox.x + bbox.w && p[1] >= bbox.y && p[1] <= bbox.y + bbox.h) {
+        // dragging existing selection
+        setDragStart(p);
+      } else {
+        // start a new lasso
+        clearSelection();
+        setLassoPoints([p]);
+      }
       return;
     }
 
@@ -473,6 +698,20 @@ function PageSheet({
       eraseAt([e.clientX - r.left, e.clientY - r.top]);
       return;
     }
+    if (tool === 'lasso') {
+      if (e.buttons === 0) return;
+      const r = surfaceRef.current!.getBoundingClientRect();
+      const p: [number, number] = [e.clientX - r.left, e.clientY - r.top];
+      if (dragStart) {
+        const dx = p[0] - dragStart[0];
+        const dy = p[1] - dragStart[1];
+        moveSelection(dx, dy);
+        setDragStart(p);
+      } else if (lassoPoints.length > 0) {
+        setLassoPoints((cur) => [...cur, p]);
+      }
+      return;
+    }
     if (!current) return;
     if (e.buttons === 0 && e.pointerType !== 'pen') return;
     setCurrent((c) => (c ? { ...c, points: [...c.points, relPoint(e)] } : c));
@@ -480,6 +719,14 @@ function PageSheet({
 
   function onPointerEnd(e: ReactPointerEvent<HTMLDivElement>) {
     (e.target as HTMLElement).releasePointerCapture?.(e.pointerId);
+    if (tool === 'lasso') {
+      if (dragStart) {
+        setDragStart(null);
+      } else {
+        finishLasso();
+      }
+      return;
+    }
     if (tool === 'eraser' || tool === 'text') return;
     if (!current) return;
     if (current.points.length > 1) {
@@ -583,7 +830,28 @@ function PageSheet({
           }}
         />
 
-        {/* ink overlay — sits on top of the text */}
+        {/* image layer — between text and ink */}
+        {(page.images ?? []).map((im) => (
+          <img
+            key={im.id}
+            src={im.src}
+            alt=""
+            draggable={false}
+            className={clsx(
+              'absolute select-none rounded-md shadow-sm',
+              selectedImageIds.has(im.id) && 'ring-2 ring-coral',
+            )}
+            style={{
+              left: im.x,
+              top: im.y,
+              width: im.w,
+              height: im.h,
+              pointerEvents: 'none',
+            }}
+          />
+        ))}
+
+        {/* ink overlay — sits on top of text + images */}
         <svg
           viewBox={`0 0 ${dims.w} ${dims.h}`}
           width={dims.w}
@@ -599,10 +867,74 @@ function PageSheet({
                 d={d}
                 fill={s.color}
                 opacity={s.tool === 'highlighter' ? 0.4 : 1}
+                stroke={selectedStrokeIds.has(s.id) ? '#e88562' : undefined}
+                strokeWidth={selectedStrokeIds.has(s.id) ? 1.5 : 0}
               />
             );
           })}
+
+          {/* live lasso path */}
+          {lassoPoints.length > 1 && (
+            <path
+              d={
+                'M' +
+                lassoPoints.map(([x, y]) => `${x},${y}`).join(' L') +
+                ' Z'
+              }
+              fill="rgba(232,133,98,0.10)"
+              stroke="#e88562"
+              strokeWidth="1.5"
+              strokeDasharray="4 3"
+            />
+          )}
+
+          {/* selection bounding box */}
+          {(() => {
+            const bbox = selectionBbox();
+            if (!bbox) return null;
+            return (
+              <rect
+                x={bbox.x}
+                y={bbox.y}
+                width={bbox.w}
+                height={bbox.h}
+                fill="rgba(232,133,98,0.06)"
+                stroke="#e88562"
+                strokeWidth="1.5"
+                strokeDasharray="4 3"
+                rx="4"
+              />
+            );
+          })()}
         </svg>
+
+        {/* selection floating action — appears next to selection bbox */}
+        {(() => {
+          const bbox = selectionBbox();
+          if (!bbox || tool !== 'lasso') return null;
+          return (
+            <div
+              className="absolute z-10 flex items-center gap-1 rounded-pill border-2 border-ink bg-surface px-2 py-1 shadow-card-sm"
+              style={{
+                left: Math.max(8, bbox.x),
+                top: Math.max(8, bbox.y - 36),
+              }}
+            >
+              <button
+                onClick={deleteSelection}
+                className="rounded-md border border-rose-deep bg-rose/30 px-2 py-0.5 font-mono text-[10px] uppercase tracking-mono text-ink"
+              >
+                ✕ delete
+              </button>
+              <button
+                onClick={clearSelection}
+                className="rounded-md border border-ink/30 bg-surface px-2 py-0.5 font-mono text-[10px] uppercase tracking-mono text-ink-soft"
+              >
+                deselect
+              </button>
+            </div>
+          );
+        })()}
       </div>
     </div>
   );

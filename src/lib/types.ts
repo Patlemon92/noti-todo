@@ -58,11 +58,22 @@ export interface CanvasTextBox {
   size: number;
 }
 
+export interface CanvasImage {
+  id: number;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  /** data:image/...;base64,... — kept inline for now (no supabase storage). */
+  src: string;
+}
+
 export interface NotePage {
   id: number;
   text: string;
   strokes: CanvasStroke[];
   template: 'blank' | 'dotted' | 'lined' | 'grid';
+  images?: CanvasImage[];
   /** Captured at save time so the SVG overlay aligns with the textarea. */
   w?: number;
   h?: number;

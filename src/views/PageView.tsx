@@ -16,6 +16,7 @@ import ReminderSheet from '../components/page/ReminderSheet';
 import RemindersStrip from '../components/page/RemindersStrip';
 import SnoozeSheet from '../components/page/SnoozeSheet';
 import SketchesSection from '../components/page/SketchesSection';
+import PhotosSection from '../components/page/PhotosSection';
 import NoteCanvas from '../components/page/NoteCanvas';
 import IconButton from '../components/ui/IconButton';
 import { supabase } from '../lib/supabase';
@@ -62,6 +63,7 @@ export default function PageView() {
   const [remindersVersion, setRemindersVersion] = useState(0);
   const [childrenVersion, setChildrenVersion] = useState(0);
   const [pullToast, setPullToast] = useState<string | null>(null);
+  const [photoOpenSignal, setPhotoOpenSignal] = useState(0);
   const [activeTimer, setActiveTimer] = useState<{
     minutes: number;
     countUp: boolean;
@@ -95,6 +97,18 @@ export default function PageView() {
 
   const isTask = page?.type === 'task';
   const isNote = page?.type === 'note';
+
+  // Notes go full-bleed on every device — sidebar hides, main loses its
+  // left margin. Matches the goodnotes-on-iPad expectation.
+  useEffect(() => {
+    if (isNote) {
+      document.body.classList.add('note-fullscreen');
+      return () => {
+        document.body.classList.remove('note-fullscreen');
+      };
+    }
+    return undefined;
+  }, [isNote]);
   const taskProps = (page?.properties as TaskProperties | undefined) ?? {};
   const checklist: ChecklistItem[] = taskProps.checklist ?? [];
   const noteProps = (page?.properties as NoteProperties | undefined) ?? {};
@@ -138,6 +152,7 @@ export default function PageView() {
     if (key === 'page-link') setPickerOpen(true);
     if (key === 'reminder') setReminderOpen(true);
     if (key === 'snooze') setSnoozeOpen(true);
+    if (key === 'image') setPhotoOpenSignal((n) => n + 1);
     if (key === 'canvas') {
       if (!page) return;
       const child = await createPage({
@@ -273,7 +288,7 @@ export default function PageView() {
 
   return (
     <div className="min-h-[100dvh] animate-pageIn pb-24 pt-3">
-      <div className={isNote ? 'view-wide' : 'view-mid'}>
+      <div className={isNote ? '' : 'view-mid'}>
       {/* top bar */}
       <div className="flex items-center justify-between px-3.5 pb-3">
         <button
@@ -387,7 +402,8 @@ export default function PageView() {
         </div>
       )}
 
-      {/* sketches section: shown for everything except notes (notes ARE canvases) */}
+      {/* sketches + photos: shown for everything except notes (notes ARE canvases) */}
+      {!isNote && <PhotosSection pageId={page.id} openSignal={photoOpenSignal} />}
       {!isNote && <SketchesSection pageId={page.id} />}
 
       <ChildPages parentId={page.id} parentType={page.type} refreshKey={childrenVersion} />

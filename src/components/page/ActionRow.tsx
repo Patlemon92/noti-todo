@@ -28,8 +28,6 @@ const PILLS: { key: ActionKey; label: string }[] = [
 
 const COMING_SOON: Partial<Record<ActionKey, string>> = {
   link: 'inline link via the floating toolbar already works. dedicated url-pin lands in stage 3.',
-  image:
-    'image attachments need supabase storage hooked up — coming in stage 3.',
   delegate:
     'sharing tasks with others lives in stage 4 (the collaboration milestone).',
 };
@@ -43,7 +41,8 @@ export default function ActionRow({ onAction }: Props) {
       key === 'page-link' ||
       key === 'reminder' ||
       key === 'snooze' ||
-      key === 'canvas'
+      key === 'canvas' ||
+      key === 'image'
     ) {
       onAction(key);
       return;
