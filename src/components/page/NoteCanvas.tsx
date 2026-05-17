@@ -276,131 +276,150 @@ export default function NoteCanvas({ initial, onSave }: Props) {
     else setPenSize(s);
   }
 
-  return (
-    <div className="mx-3.5 mb-4 overflow-hidden rounded-[14px] border-2 border-ink bg-surface shadow-card">
-      {/* tool palette */}
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b-2 border-ink bg-bg-soft px-2.5 py-2">
-        {/* tools */}
-        <div className="flex items-center gap-1 rounded-pill border-2 border-ink bg-surface p-1 shadow-card-sm">
-          <ToolBtn active={tool === 'pen'} onClick={() => setTool('pen')} label="pen">
-            ✎
-          </ToolBtn>
-          <ToolBtn
-            active={tool === 'highlighter'}
-            onClick={() => setTool('highlighter')}
-            label="highlighter"
-          >
-            ▮
-          </ToolBtn>
-          <ToolBtn active={tool === 'eraser'} onClick={() => setTool('eraser')} label="eraser">
-            ◌
-          </ToolBtn>
-          <ToolBtn active={tool === 'text'} onClick={() => setTool('text')} label="text">
-            T
-          </ToolBtn>
-        </div>
+  const [showSettings, setShowSettings] = useState(false);
 
-        {/* colors */}
+  return (
+    <div className="mb-4">
+      {/* slim icon-only toolbar */}
+      <div className="mx-auto mb-3 flex max-w-[820px] items-center gap-0.5 px-3.5">
+        <ToolIcon active={tool === 'pen'} onClick={() => { setTool('pen'); setShowSettings(false); }} label="pen">
+          ✎
+        </ToolIcon>
+        <ToolIcon active={tool === 'highlighter'} onClick={() => { setTool('highlighter'); setShowSettings(false); }} label="highlighter">
+          ▮
+        </ToolIcon>
+        <ToolIcon active={tool === 'eraser'} onClick={() => { setTool('eraser'); setShowSettings(false); }} label="eraser">
+          ◌
+        </ToolIcon>
+        <ToolIcon active={tool === 'text'} onClick={() => { setTool('text'); setShowSettings(false); }} label="text">
+          T
+        </ToolIcon>
+
+        {/* active-tool color + size chip — tap to expand */}
         {tool !== 'eraser' && (
-          <div className="flex items-center gap-1">
-            {activeColors.map((c) => (
-              <button
-                key={c}
-                onClick={() => setActiveColor(c)}
-                aria-label={`color ${c}`}
-                className={clsx(
-                  'h-6 w-6 rounded-full border-2 transition-transform',
-                  activeColor === c ? 'border-ink scale-110' : 'border-ink/30',
-                )}
+          <div className="relative ml-1">
+            <button
+              onClick={() => setShowSettings((s) => !s)}
+              aria-label="ink settings"
+              title="color · size"
+              className={clsx(
+                'flex h-8 items-center gap-1.5 rounded-pill border border-ink/20 bg-surface px-2 transition-colors hover:border-ink',
+                showSettings && 'border-ink',
+              )}
+            >
+              <span
+                className="block h-4 w-4 rounded-full border border-ink/30"
                 style={{
-                  background: c,
+                  background: activeColor,
                   opacity: tool === 'highlighter' ? 0.65 : 1,
                 }}
               />
-            ))}
+              <span
+                className="block rounded-full"
+                style={{
+                  width: Math.min(activeSize + 2, 12),
+                  height: Math.min(activeSize + 2, 12),
+                  background:
+                    tool === 'highlighter' ? `${activeColor}66` : activeColor,
+                }}
+              />
+            </button>
+            {showSettings && (
+              <div className="absolute left-0 top-full z-10 mt-1.5 flex flex-col gap-2 rounded-[12px] border-2 border-ink bg-surface p-2 shadow-card-sm">
+                <div className="flex items-center gap-1">
+                  {activeColors.map((c) => (
+                    <button
+                      key={c}
+                      onClick={() => setActiveColor(c)}
+                      aria-label={`color ${c}`}
+                      className={clsx(
+                        'h-7 w-7 rounded-full border-2 transition-transform',
+                        activeColor === c ? 'border-ink scale-110' : 'border-ink/20',
+                      )}
+                      style={{
+                        background: c,
+                        opacity: tool === 'highlighter' ? 0.65 : 1,
+                      }}
+                    />
+                  ))}
+                </div>
+                <div className="flex items-center gap-1">
+                  {activeSizes.map((s) => (
+                    <button
+                      key={s}
+                      onClick={() => setActiveSize(s)}
+                      aria-label={`size ${s}`}
+                      className={clsx(
+                        'flex h-7 w-7 items-center justify-center rounded-full border-2',
+                        activeSize === s ? 'border-ink bg-bg' : 'border-ink/20',
+                      )}
+                    >
+                      {tool === 'text' ? (
+                        <span
+                          className="font-serif font-semibold leading-none"
+                          style={{ color: activeColor, fontSize: Math.min(s, 16) }}
+                        >
+                          T
+                        </span>
+                      ) : (
+                        <span
+                          className="block rounded-full"
+                          style={{
+                            width: Math.min(s + 2, 16),
+                            height: Math.min(s + 2, 16),
+                            background:
+                              tool === 'highlighter' ? `${activeColor}66` : activeColor,
+                          }}
+                        />
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
-        {/* sizes */}
-        {tool !== 'eraser' && (
-          <div className="flex items-center gap-1">
-            {activeSizes.map((s) => (
-              <button
-                key={s}
-                onClick={() => setActiveSize(s)}
-                aria-label={`size ${s}`}
-                className={clsx(
-                  'flex h-6 w-6 items-center justify-center rounded-full border-2',
-                  activeSize === s ? 'border-ink bg-bg' : 'border-ink/30',
-                )}
-              >
-                {tool === 'text' ? (
-                  <span
-                    className="font-serif font-semibold leading-none"
-                    style={{ color: activeColor, fontSize: Math.min(s, 14) }}
-                  >
-                    T
-                  </span>
-                ) : (
-                  <span
-                    className="block rounded-full"
-                    style={{
-                      width: Math.min(s + 2, 14),
-                      height: Math.min(s + 2, 14),
-                      background:
-                        tool === 'highlighter' ? `${activeColor}66` : activeColor,
+        <div className="ml-auto flex items-center gap-0.5">
+          <div className="relative">
+            <button
+              onClick={() => setShowTemplatePicker((v) => !v)}
+              title="paper"
+              aria-label="paper"
+              className="flex h-8 items-center gap-1 rounded-pill px-2.5 font-mono text-[10px] uppercase tracking-mono text-ink-soft hover:bg-bg-soft hover:text-ink"
+            >
+              {TEMPLATES.find((t) => t.key === template)?.label}
+              <span className="text-[8px]">▾</span>
+            </button>
+            {showTemplatePicker && (
+              <div className="absolute right-0 top-full z-10 mt-1 flex flex-col gap-1 rounded-[10px] border-2 border-ink bg-surface p-1.5 shadow-card-sm">
+                {TEMPLATES.map((t) => (
+                  <button
+                    key={t.key}
+                    onClick={() => {
+                      setTemplate(t.key);
+                      setShowTemplatePicker(false);
                     }}
-                  />
-                )}
-              </button>
-            ))}
+                    className={clsx(
+                      'rounded-md px-3 py-1.5 text-left font-mono text-[11px] uppercase tracking-mono',
+                      template === t.key ? 'bg-peach text-ink' : 'hover:bg-bg-soft',
+                    )}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
-        )}
-
-        {/* paper / undo / clear / saving */}
-        <div className="relative flex items-center gap-1">
-          <button
-            onClick={() => setShowTemplatePicker((v) => !v)}
-            className="rounded-md border border-ink bg-surface px-2 py-1 font-mono text-[10px] uppercase tracking-mono"
-          >
-            {TEMPLATES.find((t) => t.key === template)?.label} ▾
-          </button>
-          {showTemplatePicker && (
-            <div className="absolute right-0 top-full z-10 mt-1 flex flex-col gap-1 rounded-[10px] border-2 border-ink bg-surface p-1.5 shadow-card-sm">
-              {TEMPLATES.map((t) => (
-                <button
-                  key={t.key}
-                  onClick={() => {
-                    setTemplate(t.key);
-                    setShowTemplatePicker(false);
-                  }}
-                  className={clsx(
-                    'rounded-md px-3 py-1.5 text-left font-mono text-[11px] uppercase tracking-mono',
-                    template === t.key ? 'bg-peach text-ink' : 'hover:bg-bg-soft',
-                  )}
-                >
-                  {t.label}
-                </button>
-              ))}
-            </div>
-          )}
-          <button
-            onClick={undo}
-            disabled={strokes.length === 0 && textBoxes.length === 0}
-            className="rounded-md border border-ink bg-surface px-2 py-1 font-mono text-[10px] uppercase tracking-mono disabled:opacity-40"
-          >
+          <ToolIcon onClick={undo} label="undo" disabled={strokes.length === 0 && textBoxes.length === 0}>
             ↶
-          </button>
-          <button
-            onClick={clearAll}
-            disabled={strokes.length === 0 && textBoxes.length === 0}
-            className="rounded-md border border-ink bg-surface px-2 py-1 font-mono text-[10px] uppercase tracking-mono disabled:opacity-40"
-          >
-            clear
-          </button>
+          </ToolIcon>
+          <ToolIcon onClick={clearAll} label="clear" disabled={strokes.length === 0 && textBoxes.length === 0}>
+            ✕
+          </ToolIcon>
           <span
             className={clsx(
-              'min-w-[42px] text-center font-mono text-[10px] uppercase tracking-mono transition-opacity',
+              'ml-1 min-w-[40px] text-center font-mono text-[10px] uppercase tracking-mono transition-opacity',
               saveStatus === 'idle' && 'opacity-0',
               saveStatus === 'saving' && 'text-ink-soft',
               saveStatus === 'saved' && 'text-mint-deep',
@@ -411,7 +430,8 @@ export default function NoteCanvas({ initial, onSave }: Props) {
         </div>
       </div>
 
-      {/* canvas surface */}
+      {/* paper — centered, soft shadow, looks like it's sitting on the cream bg */}
+      <div className="px-3.5 sm:px-8">
       <div
         ref={surfaceRef}
         onPointerDown={onPointerDown}
@@ -419,7 +439,7 @@ export default function NoteCanvas({ initial, onSave }: Props) {
         onPointerUp={onPointerEnd}
         onPointerCancel={onPointerEnd}
         className={clsx(
-          'relative h-[min(70vh,720px)] touch-none overflow-hidden bg-surface',
+          'relative mx-auto h-[min(78vh,820px)] max-w-[820px] touch-none overflow-hidden rounded-[6px] border border-ink/15 bg-surface shadow-[0_8px_28px_rgba(42,37,32,0.10),0_2px_4px_rgba(42,37,32,0.06)]',
           tool === 'eraser' && 'cursor-crosshair',
         )}
         style={paperBgStyle(template)}
@@ -498,6 +518,7 @@ export default function NoteCanvas({ initial, onSave }: Props) {
           </div>
         )}
       </div>
+      </div>
     </div>
   );
 }
@@ -506,25 +527,31 @@ export default function NoteCanvas({ initial, onSave }: Props) {
 // helpers (shared with SketchCanvas conceptually — duplicated for now)
 // ============================================================================
 
-function ToolBtn({
+function ToolIcon({
   active,
   onClick,
   label,
+  disabled,
   children,
 }: {
-  active: boolean;
+  active?: boolean;
   onClick: () => void;
   label: string;
+  disabled?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <button
       onClick={onClick}
+      disabled={disabled}
       title={label}
       aria-label={label}
       className={clsx(
-        'flex h-8 w-8 items-center justify-center rounded-full font-mono text-[14px] transition-colors',
-        active ? 'bg-ink text-bg' : 'text-ink-soft hover:bg-bg-soft hover:text-ink',
+        'flex h-8 w-8 items-center justify-center rounded-pill font-mono text-[14px] transition-colors',
+        active
+          ? 'bg-peach text-ink'
+          : 'text-ink-soft hover:bg-bg-soft hover:text-ink',
+        disabled && 'opacity-40 hover:bg-transparent',
       )}
     >
       {children}
