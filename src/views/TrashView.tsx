@@ -4,6 +4,7 @@ import clsx from 'clsx';
 
 import BottomNav from '../components/ui/BottomNav';
 import TopStrip from '../components/ui/TopStrip';
+import { useRealtimeUserData } from '../hooks/useRealtimeUserData';
 import {
   listTrash,
   permanentlyDeletePage,
@@ -38,6 +39,8 @@ export default function TrashView() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useRealtimeUserData({ onPages: () => void load() });
 
   async function onRestore(p: Page) {
     setPages((cur) => cur.filter((x) => x.id !== p.id));

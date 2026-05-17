@@ -267,12 +267,45 @@ export async function recordWin(input: {
 }
 
 export async function completeTask(pageId: string, title: string): Promise<void> {
+  // Read current state so we can check recurrence + spawn next occurrence.
+  const page = await getPage(pageId);
   await updatePage(pageId, { completed_at: new Date().toISOString() });
   await recordWin({
     source_type: 'task_completed',
     source_id: pageId,
     text: title,
   });
+  if (page && page.type === 'task') {
+    const props = (page.properties as import('./types').TaskProperties | undefined) ?? {};
+    if (props.recurrence) {
+      try {
+        const { nextOccurrence } = await import('./recurrence');
+        const next = nextOccurrence(props.recurrence, new Date());
+        // spawn the next occurrence — same title/body/parent/recurrence,
+        // snoozed_until = computed next date so it stays hidden from focus
+        // until that time arrives. status reset to 'today'.
+        await createPage({
+          type: 'task',
+          title: page.title,
+          body: page.body,
+          parent_id: page.parent_id ?? null,
+          properties: {
+            ...props,
+            status: 'today',
+            snoozed_until: next.toISOString(),
+            // clear any old checklist completions so the new instance starts fresh
+            checklist: (props.checklist ?? []).map((it) => ({
+              ...it,
+              done: false,
+              done_at: undefined,
+            })),
+          },
+        });
+      } catch {
+        // recurrence is nice-to-have; never block the completion
+      }
+    }
+  }
 }
 
 export async function uncompleteTask(pageId: string): Promise<void> {

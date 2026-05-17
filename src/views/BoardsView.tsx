@@ -23,6 +23,7 @@ import clsx from 'clsx';
 
 import BottomNav from '../components/ui/BottomNav';
 import TopStrip from '../components/ui/TopStrip';
+import { useRealtimeUserData } from '../hooks/useRealtimeUserData';
 import Sheet from '../components/ui/Sheet';
 import QuickAddSheet from '../components/page/QuickAddSheet';
 import {
@@ -134,6 +135,14 @@ export default function BoardsView() {
     if (!active) return;
     void loadTasks(active.id);
   }, [active]);
+
+  // realtime: any pages change → refresh boards + tasks
+  useRealtimeUserData({
+    onPages: () => {
+      void loadBoards();
+      if (active) void loadTasks(active.id);
+    },
+  });
 
   // ----- column model -----
   // explicitly-empty arrays count as 'no columns yet' for new boards.

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { nextFocusCandidates } from '../lib/db';
 import type { Page } from '../lib/types';
+import { useRealtimeUserData } from './useRealtimeUserData';
 
 export function useFocusTask() {
   const [candidates, setCandidates] = useState<Page[]>([]);
@@ -42,6 +43,9 @@ export function useFocusTask() {
       window.removeEventListener('focus', onVis);
     };
   }, [reload]);
+
+  // realtime: any pages change for this user → reload (covers cross-tab/device)
+  useRealtimeUserData({ onPages: () => void reload() });
 
   const visible = useMemo(
     () => candidates.filter((p) => !dismissed.has(p.id)),

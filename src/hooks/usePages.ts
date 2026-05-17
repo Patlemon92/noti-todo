@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { listPages } from '../lib/db';
 import type { Page, PageType } from '../lib/types';
+import { useRealtimeUserData } from './useRealtimeUserData';
 
 interface Opts {
   type?: PageType | PageType[];
@@ -37,6 +38,9 @@ export function usePages(opts: Opts) {
     const cleanup = reload();
     return cleanup;
   }, [reload]);
+
+  // realtime: refresh on any pages change for this user
+  useRealtimeUserData({ onPages: () => void reload() });
 
   return { pages, loading, error, reload };
 }

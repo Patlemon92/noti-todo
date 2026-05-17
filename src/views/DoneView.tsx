@@ -5,6 +5,7 @@ import clsx from 'clsx';
 
 import BottomNav from '../components/ui/BottomNav';
 import TopStrip from '../components/ui/TopStrip';
+import { useRealtimeUserData } from '../hooks/useRealtimeUserData';
 import {
   deletePage,
   getPage,
@@ -33,6 +34,8 @@ export default function DoneView() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useRealtimeUserData({ onPages: () => void load() });
 
   // hydrate parent board titles for context labels
   useEffect(() => {

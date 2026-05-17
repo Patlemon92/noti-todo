@@ -19,6 +19,14 @@ export interface ChecklistItem {
   done_at?: string;
 }
 
+export type RecurrenceRule = 'daily' | 'weekdays' | 'weekly' | 'biweekly' | 'monthly' | 'custom';
+
+export interface TaskRecurrence {
+  rule: RecurrenceRule;
+  /** For 'custom' — days between occurrences. */
+  every_n_days?: number;
+}
+
 export interface TaskProperties {
   status?: TaskStatus;
   board_id?: string;
@@ -27,6 +35,8 @@ export interface TaskProperties {
   checklist?: ChecklistItem[];
   due_at?: string;
   estimated_minutes?: number;
+  /** When set, completing the task spawns a new instance snoozed until the next occurrence. */
+  recurrence?: TaskRecurrence;
 }
 
 export interface BoardColumn {

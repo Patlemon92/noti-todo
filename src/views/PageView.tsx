@@ -18,6 +18,8 @@ import SnoozeSheet from '../components/page/SnoozeSheet';
 import SketchesSection from '../components/page/SketchesSection';
 import PhotosSection from '../components/page/PhotosSection';
 import NoteCanvas from '../components/page/NoteCanvas';
+import RecurrenceSheet from '../components/page/RecurrenceSheet';
+import { describeRecurrence } from '../lib/recurrence';
 import IconButton from '../components/ui/IconButton';
 import { supabase } from '../lib/supabase';
 import {
@@ -60,6 +62,7 @@ export default function PageView() {
   const [breakDownOpen, setBreakDownOpen] = useState(false);
   const [reminderOpen, setReminderOpen] = useState(false);
   const [snoozeOpen, setSnoozeOpen] = useState(false);
+  const [recurrenceOpen, setRecurrenceOpen] = useState(false);
   const [remindersVersion, setRemindersVersion] = useState(0);
   const [childrenVersion, setChildrenVersion] = useState(0);
   const [pullToast, setPullToast] = useState<string | null>(null);
@@ -159,6 +162,7 @@ export default function PageView() {
     if (key === 'page-link') setPickerOpen(true);
     if (key === 'reminder') setReminderOpen(true);
     if (key === 'snooze') setSnoozeOpen(true);
+    if (key === 'recurrence') setRecurrenceOpen(true);
     if (key === 'image') setPhotoOpenSignal((n) => n + 1);
     if (key === 'canvas') {
       if (!page) return;
@@ -323,6 +327,18 @@ export default function PageView() {
       {isTask && (
         <>
           <ActionRow onAction={onAction} />
+          {taskProps.recurrence && (
+            <div className="mx-3.5 mb-3">
+              <button
+                onClick={() => setRecurrenceOpen(true)}
+                className="inline-flex items-center gap-1.5 rounded-pill border-[1.5px] border-ink bg-lavender px-3 py-1 font-mono text-[11px] uppercase tracking-mono shadow-card-sm hover:bg-lavender-deep/30"
+                title="edit repeat"
+              >
+                <span className="text-coral">↻</span>
+                {describeRecurrence(taskProps.recurrence)}
+              </button>
+            </div>
+          )}
           <RemindersStrip pageId={page.id} refreshKey={remindersVersion} />
           {activeTimer && (
             <TimerChip
@@ -445,6 +461,12 @@ export default function PageView() {
           // refresh page so the snoozed_until shows in subsequent loads
           void save({});
         }}
+      />
+      <RecurrenceSheet
+        open={recurrenceOpen}
+        page={page}
+        onClose={() => setRecurrenceOpen(false)}
+        onSaved={() => void save({})}
       />
       <PagePickerSheet
         open={pickerOpen}
