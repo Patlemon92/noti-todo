@@ -9,16 +9,16 @@ interface Body {
   page_id: string;
 }
 
-const SYSTEM = `the user is stuck on a task. give them ONE concrete tiny action they can do RIGHT NOW.
+const SYSTEM = `the user wants a sharp thinking prompt about a task — something to engage their brain.
 
 rules:
-- 40 words MAX. count them.
-- action-first: start with a verb. "open …", "draft …", "send …", "find …", "test …".
-- the action must take under 90 seconds. ideally 30. lowest-friction physical move that gets them past the static state.
-- be specific to the task as written. don't invent details.
-- never ask a question. never say "maybe try" or "you could". direct instruction only.
-- never motivation-speak ("you've got this!"). never apologies. no preamble.
-- if the task is too vague to act on, give the action "rewrite this title as a verb + object so you know what to actually do" — and stop.
+- 30 words MAX. count them.
+- ONE question. not a survey, a scalpel.
+- the kind of question a thoughtful collaborator would ask: provocative, specific to the task, unlocks insight or reveals a hidden assumption.
+- good shapes: "what's the smallest version you'd ship today?", "who is this actually for?", "what happens if you skip it entirely?".
+- avoid generic meta ("what's your goal?", "what's blocking you?"). that's a survey, not a scalpel.
+- no preamble. no "here's a question:". just the question.
+- no motivation-speak. no apologies.
 
 output format: { "response": string }`;
 
@@ -74,12 +74,12 @@ Deno.serve(async (req) => {
     const result = await callAnthropic<{ response: string }>({
       system: SYSTEM,
       user: prompt,
-      maxTokens: 150,
+      maxTokens: 120,
       jsonMode: true,
     });
 
     const response = typeof result.parsed?.response === 'string'
-      ? result.parsed.response.trim().slice(0, 400)
+      ? result.parsed.response.trim().slice(0, 300)
       : '';
 
     if (!response) throw new Error('empty response');
@@ -87,7 +87,7 @@ Deno.serve(async (req) => {
     await logAiCall({
       adminClient: ctx.adminClient,
       userId: ctx.userId,
-      feature: 'stuck',
+      feature: 'ask',
       pageId: page.id,
       inputTokens: result.inputTokens,
       outputTokens: result.outputTokens,
@@ -103,7 +103,7 @@ Deno.serve(async (req) => {
     await logAiCall({
       adminClient: ctx.adminClient,
       userId: ctx.userId,
-      feature: 'stuck',
+      feature: 'ask',
       pageId: body.page_id,
       succeeded: false,
       error: msg.slice(0, 500),

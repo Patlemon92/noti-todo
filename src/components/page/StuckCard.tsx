@@ -1,38 +1,39 @@
 import { useState } from 'react';
-import { aiStuck } from '../../lib/ai';
+import clsx from 'clsx';
+import { aiAsk, aiStuck } from '../../lib/ai';
 
 interface Props {
   pageId: string;
 }
 
+type Mode = 'action' | 'question';
 type Status = 'idle' | 'loading' | 'shown' | 'error';
 
 export default function StuckCard({ pageId }: Props) {
   const [status, setStatus] = useState<Status>('idle');
+  const [mode, setMode] = useState<Mode | null>(null);
   const [response, setResponse] = useState<string | null>(null);
-  const [kind, setKind] = useState<'question' | 'action'>('question');
-
   const [errMsg, setErrMsg] = useState<string | null>(null);
 
-  async function go() {
+  async function run(next: Mode) {
+    setMode(next);
     setStatus('loading');
     setErrMsg(null);
     try {
-      const r = await aiStuck(pageId);
+      const r = next === 'action' ? await aiStuck(pageId) : await aiAsk(pageId);
       // eslint-disable-next-line no-console
-      console.info('[stuck]', r);
+      console.info(`[${next}]`, r);
       if (!r.response || !r.response.trim()) {
         setErrMsg('ai returned an empty response');
         setStatus('error');
         return;
       }
       setResponse(r.response);
-      setKind(r.kind);
       setStatus('shown');
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       // eslint-disable-next-line no-console
-      console.error('[stuck]', err);
+      console.error(`[${next}]`, err);
       setErrMsg(msg.slice(0, 140));
       setStatus('error');
     }
@@ -40,9 +41,12 @@ export default function StuckCard({ pageId }: Props) {
 
   if (status === 'idle') {
     return (
-      <div className="mx-3.5 mb-3">
-        <button onClick={go} className="pill-action">
+      <div className="mx-3.5 mb-3 flex flex-wrap gap-2">
+        <button onClick={() => run('action')} className="pill-action">
           <span className="text-coral">✦</span> i'm stuck
+        </button>
+        <button onClick={() => run('question')} className="pill-action">
+          <span className="text-coral">✦</span> ask me something
         </button>
       </div>
     );
@@ -61,13 +65,27 @@ export default function StuckCard({ pageId }: Props) {
       <div className="mx-3.5 mb-3 flex items-start justify-between gap-3 rounded-[14px] border-[1.5px] border-rose-deep bg-rose/40 px-3.5 py-3 text-[13px]">
         <div className="flex-1">
           <div className="font-semibold">ai is napping</div>
-          {errMsg && <div className="mt-0.5 text-[11px] text-ink-soft">{errMsg}</div>}
+          {errMsg && (
+            <div className="mt-0.5 text-[11px] text-ink-soft">{errMsg}</div>
+          )}
         </div>
         <div className="flex flex-col gap-1">
-          <button onClick={go} className="font-mono text-[11px] uppercase underline">
-            retry
-          </button>
-          <button onClick={() => setStatus('idle')} className="font-mono text-[11px] uppercase">
+          {mode && (
+            <button
+              onClick={() => run(mode)}
+              className="font-mono text-[11px] uppercase underline"
+            >
+              retry
+            </button>
+          )}
+          <button
+            onClick={() => {
+              setStatus('idle');
+              setMode(null);
+              setResponse(null);
+            }}
+            className="font-mono text-[11px] uppercase"
+          >
             dismiss
           </button>
         </div>
@@ -75,25 +93,53 @@ export default function StuckCard({ pageId }: Props) {
     );
   }
 
+  // shown
+  const isQuestion = mode === 'question';
   return (
-    <div className="mx-3.5 mb-3 rounded-[14px] border-2 border-ink bg-butter px-3.5 py-3 shadow-card-sm">
+    <div
+      className={clsx(
+        'mx-3.5 mb-3 rounded-[14px] border-2 border-ink px-3.5 py-3 shadow-card-sm',
+        isQuestion ? 'bg-lavender' : 'bg-butter',
+      )}
+    >
       <div className="mb-1 font-mono text-[10px] uppercase tracking-mono-wide text-ink-soft">
-        {kind === 'question' ? '✦ a question' : '✦ try this'}
+        {isQuestion ? '✦ a question' : '✦ try this'}
       </div>
       <p className="text-[14px] leading-snug">{response}</p>
-      <div className="mt-2 flex gap-3">
+      <div className="mt-2 flex flex-wrap gap-3 text-[11px]">
         <button
-          onClick={() => setStatus('idle')}
-          className="font-mono text-[11px] uppercase tracking-mono text-ink-soft underline"
+          onClick={() => {
+            setStatus('idle');
+            setMode(null);
+            setResponse(null);
+          }}
+          className="font-mono uppercase tracking-mono text-ink-soft underline"
         >
           dismiss
         </button>
-        <button
-          onClick={go}
-          className="font-mono text-[11px] uppercase tracking-mono text-ink-soft underline"
-        >
-          another
-        </button>
+        {mode && (
+          <button
+            onClick={() => run(mode)}
+            className="font-mono uppercase tracking-mono text-ink-soft underline"
+          >
+            another
+          </button>
+        )}
+        {isQuestion ? (
+          <button
+            onClick={() => run('action')}
+            className="font-mono uppercase tracking-mono text-ink-soft underline"
+          >
+            give me an action instead
+          </button>
+        ) : (
+          <button
+            onClick={() => run('question')}
+            className="font-mono uppercase tracking-mono text-ink-soft underline"
+          >
+            ask me something instead
+          </button>
+        )}
       </div>
     </div>
   );

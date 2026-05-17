@@ -13,5 +13,8 @@ verify_jwt = true
 [functions.ai-stuck]
 verify_jwt = true
 
+[functions.ai-ask]
+verify_jwt = true
+
 [functions.push-reminders]
 verify_jwt = false

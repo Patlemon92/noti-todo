@@ -31,8 +31,9 @@ export async function aiBreakDown(pageId: string) {
 }
 
 export async function aiStuck(pageId: string) {
-  return invoke<{ response: string; kind: 'question' | 'action' }>(
-    'ai-stuck',
-    { page_id: pageId },
-  );
+  return invoke<{ response: string }>('ai-stuck', { page_id: pageId });
+}
+
+export async function aiAsk(pageId: string) {
+  return invoke<{ response: string }>('ai-ask', { page_id: pageId });
 }
