@@ -18,6 +18,10 @@ Patrick Lemon is the founder of Noti (noti.com.au), Sydney. He writes in lowerca
 - When ambiguous, ask before guessing — but not for every tiny thing.
 - Small commits with clear messages. He should be able to read `git log` and understand a session's worth of work.
 
+## Companion planning docs
+
+- `docs/aliveness-automation.md` — design philosophy + planned automation engine + the "aliveness" framework (maintenance / memory / kindnesses / time-aware). Read before planning any stage 3+ work that touches automated behaviors, focus screen language, or system-feel decisions.
+
 ## Tech stack
 
 - **Vite + React 18 + TypeScript** — frontend
