@@ -29,6 +29,7 @@ import {
   deletePage,
   getPage,
   recordWin,
+  uncompleteTask,
   updatePage,
 } from '../lib/db';
 import type {
@@ -432,13 +433,44 @@ export default function PageView() {
       <ChildPages parentId={page.id} parentType={page.type} refreshKey={childrenVersion} />
       <Backlinks pageId={page.id} />
 
-      {/* close fab */}
-      <button
-        onClick={close}
-        className="fixed bottom-[18px] right-[18px] z-[81] rounded-[14px] border-2 border-ink bg-ink px-5 py-3 font-sans text-[14px] font-bold text-bg shadow-mint active:translate-x-[1px] active:translate-y-[1px] active:shadow-none"
-      >
-        close ✓
-      </button>
+      {/* fab row — mark done / undo done (task only), close (all) */}
+      <div className="fixed bottom-[18px] right-[18px] z-[81] flex items-center gap-2">
+        {isTask && (
+          page.completed_at ? (
+            <button
+              onClick={async () => {
+                await uncompleteTask(page.id);
+                await save({ completed_at: null });
+              }}
+              title="undo done"
+              className="rounded-[14px] border-2 border-ink bg-lavender px-4 py-3 font-sans text-[14px] font-semibold text-ink shadow-card active:translate-x-[1px] active:translate-y-[1px] active:shadow-none"
+            >
+              ↺ undo done
+            </button>
+          ) : (
+            <button
+              onClick={async () => {
+                await completeTask(page.id, page.title || 'untitled task');
+                await save({ completed_at: new Date().toISOString() });
+                // tasks with recurrence will spawn the next instance via
+                // completeTask. close the view so user sees the focus
+                // screen reflect the change.
+                nav(-1);
+              }}
+              title="mark done"
+              className="rounded-[14px] border-2 border-ink bg-mint px-4 py-3 font-sans text-[14px] font-bold text-ink shadow-card active:translate-x-[1px] active:translate-y-[1px] active:shadow-none"
+            >
+              ✓ mark done
+            </button>
+          )
+        )}
+        <button
+          onClick={close}
+          className="rounded-[14px] border-2 border-ink bg-ink px-5 py-3 font-sans text-[14px] font-bold text-bg shadow-mint active:translate-x-[1px] active:translate-y-[1px] active:shadow-none"
+        >
+          close
+        </button>
+      </div>
 
       {/* sheets / popups */}
       <TimerSheet
