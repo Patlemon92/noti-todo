@@ -409,18 +409,39 @@ function PageSheet({
   }
 
   function eraseAt(p: [number, number]) {
-    for (let i = page.strokes.length - 1; i >= 0; i--) {
-      const s = page.strokes[i];
-      const hit = (s.size + 14) * (s.size + 14);
-      for (const pt of s.points) {
+    // Pixel eraser: split each stroke at points within the eraser radius
+    // instead of removing the whole stroke. Each contiguous run of surviving
+    // points becomes its own sub-stroke (with a new id).
+    const ERASER_RADIUS = 16;
+    const r2 = ERASER_RADIUS * ERASER_RADIUS;
+    const next: Stroke[] = [];
+    let anyChanged = false;
+    for (const stroke of page.strokes) {
+      let segment: Pt[] = [];
+      const segments: Pt[][] = [];
+      let strokeChanged = false;
+      for (const pt of stroke.points) {
         const dx = pt[0] - p[0];
         const dy = pt[1] - p[1];
-        if (dx * dx + dy * dy <= hit) {
-          onStrokesChange(page.strokes.filter((_, idx) => idx !== i));
-          return;
+        if (dx * dx + dy * dy <= r2) {
+          if (segment.length > 1) segments.push(segment);
+          segment = [];
+          strokeChanged = true;
+        } else {
+          segment.push(pt);
+        }
+      }
+      if (segment.length > 1) segments.push(segment);
+      if (!strokeChanged) {
+        next.push(stroke);
+      } else {
+        anyChanged = true;
+        for (const seg of segments) {
+          next.push({ ...stroke, id: nextStrokeId(), points: seg });
         }
       }
     }
+    if (anyChanged) onStrokesChange(next);
   }
 
   function onPointerDown(e: ReactPointerEvent<HTMLDivElement>) {
