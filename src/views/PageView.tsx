@@ -316,9 +316,18 @@ export default function PageView() {
           <span className="block h-[9px] w-[9px] rounded-full border-[1.5px] border-ink bg-sky-deep" />
           <span>{ctxLabel}</span>
         </Link>
-        <IconButton aria-label="page menu" onClick={onDelete} title="delete page">
-          ⋯
-        </IconButton>
+        <PageMenu
+          page={page}
+          onComplete={async () => {
+            await completeTask(page.id, page.title || 'untitled task');
+            await save({ completed_at: new Date().toISOString() });
+          }}
+          onUncomplete={async () => {
+            await uncompleteTask(page.id);
+            await save({ completed_at: null });
+          }}
+          onDelete={onDelete}
+        />
       </div>
 
       {/* title */}
@@ -530,6 +539,164 @@ export default function PageView() {
       />
       </div>
     </div>
+  );
+}
+
+function PageMenu({
+  page,
+  onComplete,
+  onUncomplete,
+  onDelete,
+}: {
+  page: Page;
+  onComplete: () => void | Promise<void>;
+  onUncomplete: () => void | Promise<void>;
+  onDelete: () => void | Promise<void>;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const isTask = page.type === 'task';
+  const isDone = !!page.completed_at;
+
+  useEffect(() => {
+    if (!open) return;
+    function onDoc(e: MouseEvent) {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setOpen(false);
+    }
+    document.addEventListener('mousedown', onDoc);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDoc);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  function run(fn: () => void | Promise<void>) {
+    setOpen(false);
+    void fn();
+  }
+
+  return (
+    <div className="relative" ref={ref}>
+      <IconButton aria-label="page menu" onClick={() => setOpen((v) => !v)}>
+        ⋯
+      </IconButton>
+      {open && (
+        <div className="absolute right-0 top-full z-30 mt-1 flex w-44 flex-col overflow-hidden rounded-[12px] border-2 border-ink bg-surface shadow-card-sm">
+          {isTask && (
+            isDone ? (
+              <MenuItem
+                icon={<UndoTickIcon />}
+                label="undo done"
+                onClick={() => run(onUncomplete)}
+              />
+            ) : (
+              <MenuItem
+                icon={<TickIcon />}
+                label="mark done"
+                onClick={() => run(onComplete)}
+              />
+            )
+          )}
+          <MenuItem
+            icon={<BinIcon />}
+            label="delete"
+            danger
+            onClick={() => run(onDelete)}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MenuItem({
+  icon,
+  label,
+  onClick,
+  danger,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  onClick: () => void;
+  danger?: boolean;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={
+        'flex items-center gap-2.5 border-b border-dashed border-black/10 px-3 py-2.5 text-left text-[13.5px] font-medium transition-colors last:border-b-0 ' +
+        (danger
+          ? 'text-ink hover:bg-rose hover:text-ink'
+          : 'text-ink hover:bg-bg-soft')
+      }
+    >
+      <span className="flex h-5 w-5 items-center justify-center text-ink-soft">
+        {icon}
+      </span>
+      <span>{label}</span>
+    </button>
+  );
+}
+
+function TickIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="16"
+      height="16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M5 12.5l4.5 4.5L19 7.5" />
+    </svg>
+  );
+}
+
+function UndoTickIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="16"
+      height="16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M3 9.5h11a5 5 0 0 1 0 10H9" />
+      <path d="M6.5 6L3 9.5 6.5 13" />
+    </svg>
+  );
+}
+
+function BinIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="16"
+      height="16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M4 7h16" />
+      <path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" />
+      <path d="M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13" />
+      <path d="M10 11v6M14 11v6" />
+    </svg>
   );
 }
 
