@@ -109,6 +109,13 @@ export default function PageView() {
     }
     return undefined;
   }, [isNote]);
+
+  // Scroll the window to the top whenever the page id changes, otherwise
+  // notes (with their tall canvases) inherit the scroll position from the
+  // previous view and appear to open at the bottom.
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  }, [id]);
   const taskProps = (page?.properties as TaskProperties | undefined) ?? {};
   const checklist: ChecklistItem[] = taskProps.checklist ?? [];
   const noteProps = (page?.properties as NoteProperties | undefined) ?? {};

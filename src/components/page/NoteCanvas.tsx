@@ -307,9 +307,9 @@ export default function NoteCanvas({ initial, onSave }: Props) {
 
   return (
     <div className="mb-4">
-      {/* slim toolbar — no pill chrome, just icons on the cream bg */}
-      <div className="sticky top-0 z-20 mb-2 bg-bg/80 px-3.5 py-1 backdrop-blur-sm">
-        <div className="mx-auto flex max-w-[1500px] items-center gap-0">
+      {/* slim toolbar — same horizontal width as the paper, sits just above it */}
+      <div className="mb-1 px-3.5 sm:px-8">
+        <div className="mx-auto flex max-w-[1500px] items-center justify-between gap-1 rounded-pill border border-ink/10 bg-bg-soft/60 px-1.5 py-0.5">
           <ToolIcon active={tool === 'text'} onClick={() => { setTool('text'); setShowSettings(false); }} label="text">
             T
           </ToolIcon>
@@ -328,6 +328,17 @@ export default function NoteCanvas({ initial, onSave }: Props) {
           <ToolIcon onClick={onPickImage} label="insert image">
             <PhotoFrameIcon />
           </ToolIcon>
+
+          {/* paper template inline in the global toolbar */}
+          <span className="mx-1 h-4 w-px bg-ink/15" />
+          {pages[0] && (
+            <PaperTemplateInline
+              current={pages[0].template}
+              onPick={(t) =>
+                setPages((cur) => cur.map((p) => ({ ...p, template: t })))
+              }
+            />
+          )}
           <input
             ref={imageInputRef}
             type="file"
@@ -410,18 +421,16 @@ export default function NoteCanvas({ initial, onSave }: Props) {
             </div>
           )}
 
-          <div className="ml-auto flex items-center gap-0.5">
-            <span
-              className={clsx(
-                'min-w-[40px] text-center font-mono text-[10px] uppercase tracking-mono transition-opacity',
-                saveStatus === 'idle' && 'opacity-0',
-                saveStatus === 'saving' && 'text-ink-soft',
-                saveStatus === 'saved' && 'text-mint-deep',
-              )}
-            >
-              {saveStatus === 'saving' ? 'saving…' : saveStatus === 'saved' ? 'saved' : ''}
-            </span>
-          </div>
+          <span
+            className={clsx(
+              'ml-auto text-center font-mono text-[10px] uppercase tracking-mono transition-opacity',
+              saveStatus === 'idle' && 'opacity-0',
+              saveStatus === 'saving' && 'text-ink-soft',
+              saveStatus === 'saved' && 'text-mint-deep',
+            )}
+          >
+            {saveStatus === 'saving' ? 'saving…' : saveStatus === 'saved' ? 'saved' : ''}
+          </span>
         </div>
       </div>
 
@@ -771,15 +780,13 @@ function PageSheet({
 
   return (
     <div className="relative">
-      {/* page header — only shown when there's more than one page; otherwise empty */}
-      <div className="mb-1.5 flex h-[18px] items-center justify-between px-1">
-        {totalPages > 1 ? (
-          <span className="font-mono text-[10px] uppercase tracking-mono text-ink-faint">
-            page {pageNumber} / {totalPages}
-          </span>
-        ) : (
-          <span />
-        )}
+      {/* page header — only renders chrome when there's MORE than one page.
+       * single-page notes have zero header height (paper sits right under toolbar). */}
+      {totalPages > 1 ? (
+      <div className="mb-1 flex h-[18px] items-center justify-between px-1">
+        <span className="font-mono text-[10px] uppercase tracking-mono text-ink-faint">
+          page {pageNumber} / {totalPages}
+        </span>
         <div className="relative flex items-center gap-1">
           <button
             onClick={() => setShowTemplatePicker((v) => !v)}
@@ -818,6 +825,7 @@ function PageSheet({
           )}
         </div>
       </div>
+      ) : null}
 
       {/* paper sheet */}
       <div
@@ -961,6 +969,47 @@ function PageSheet({
 // ============================================================================
 // helpers
 // ============================================================================
+/** Paper template chooser — sits in the global toolbar, applies to all pages. */
+function PaperTemplateInline({
+  current,
+  onPick,
+}: {
+  current: Template;
+  onPick: (t: Template) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="rounded-pill px-2 py-1 font-mono text-[10px] uppercase tracking-mono text-ink-soft hover:bg-bg-soft hover:text-ink"
+        title="paper template"
+      >
+        {TEMPLATES.find((t) => t.key === current)?.label} ▾
+      </button>
+      {open && (
+        <div className="absolute left-0 top-full z-30 mt-1.5 flex flex-col gap-1 rounded-[10px] border-2 border-ink bg-surface p-1.5 shadow-card-sm">
+          {TEMPLATES.map((t) => (
+            <button
+              key={t.key}
+              onClick={() => {
+                onPick(t.key);
+                setOpen(false);
+              }}
+              className={clsx(
+                'rounded-md px-3 py-1.5 text-left font-mono text-[11px] uppercase tracking-mono',
+                current === t.key ? 'bg-peach text-ink' : 'hover:bg-bg-soft',
+              )}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PhotoFrameIcon() {
   return (
     <svg
