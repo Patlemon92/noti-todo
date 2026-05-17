@@ -357,3 +357,92 @@ body.note-fullscreen [data-shell="sidebar"] {
 body.note-fullscreen main {
   margin-left: 0 !important;
 }
+
+/* ============================================================================
+ * note editor — Tiptap with markdown shortcuts.
+ * Styles target ProseMirror's output inside the .md-editor wrapper.
+ * ========================================================================== */
+.md-editor {
+  font-family: 'Bricolage Grotesque', system-ui, -apple-system, sans-serif;
+  font-size: 17px;
+  line-height: 28px;
+  color: var(--ink);
+  padding: 36px 44px;
+  min-height: 640px;
+  outline: none;
+  caret-color: var(--ink);
+}
+.md-editor p {
+  margin: 0;
+}
+.md-editor h1 {
+  font-family: 'Fraunces', serif;
+  font-weight: 600;
+  font-size: 28px;
+  line-height: 1.2;
+  margin: 0.6em 0 0.3em;
+  letter-spacing: -0.01em;
+}
+.md-editor h2 {
+  font-family: 'Fraunces', serif;
+  font-weight: 600;
+  font-size: 22px;
+  line-height: 1.2;
+  margin: 0.5em 0 0.25em;
+}
+.md-editor h3 {
+  font-family: 'Fraunces', serif;
+  font-weight: 600;
+  font-size: 18px;
+  margin: 0.4em 0 0.2em;
+}
+.md-editor ul,
+.md-editor ol {
+  padding-left: 1.5em;
+  margin: 0.2em 0;
+}
+.md-editor li {
+  margin: 0.15em 0;
+}
+.md-editor li > p {
+  margin: 0;
+}
+.md-editor blockquote {
+  border-left: 3px solid var(--ink);
+  padding-left: 0.8em;
+  margin: 0.4em 0;
+  color: var(--ink-soft);
+  font-style: italic;
+}
+.md-editor hr {
+  border: none;
+  border-top: 1.5px dashed rgba(42, 37, 32, 0.25);
+  margin: 0.8em 0;
+}
+.md-editor code {
+  background: var(--bg-soft);
+  border: 1px solid var(--ink-faint);
+  padding: 0.05em 0.3em;
+  border-radius: 4px;
+  font-family: 'VT323', monospace;
+  font-size: 0.95em;
+}
+.md-editor pre {
+  background: var(--ink);
+  color: var(--bg);
+  padding: 12px;
+  border-radius: 8px;
+  font-family: 'VT323', monospace;
+  font-size: 14px;
+  overflow-x: auto;
+  margin: 0.5em 0;
+}
+.md-editor strong { font-weight: 700; }
+.md-editor em { font-style: italic; }
+.md-editor p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: var(--ink-faint);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}

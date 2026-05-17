@@ -115,7 +115,7 @@ export default function PhotosSection({ pageId, openSignal = 0 }: Props) {
         <div className="surface-card mx-3.5 mb-4 overflow-hidden">
           <div className="flex items-center justify-between border-b-[1.5px] border-dashed border-ink bg-bg-soft px-3.5 py-2.5">
             <h3 className="flex items-center gap-2 font-mono text-[14px] uppercase tracking-mono-wide">
-              <span>📷</span> photos
+              <CameraIcon /> photos
             </h3>
             <span className="font-mono text-[12px] text-ink-soft">
               {photos.length}
@@ -144,6 +144,8 @@ export default function PhotosSection({ pageId, openSignal = 0 }: Props) {
         <div
           onClick={() => setView(null)}
           className="fixed inset-0 z-[130] flex items-center justify-center bg-ink/80 p-4 backdrop-blur-md animate-fadeIn"
+          role="dialog"
+          aria-modal="true"
         >
           <div
             onClick={(e) => e.stopPropagation()}
@@ -181,5 +183,27 @@ export default function PhotosSection({ pageId, openSignal = 0 }: Props) {
         </div>
       )}
     </>
+  );
+}
+
+/** Small, hand-drawn-style camera. Matches design system stroke weight. */
+function CameraIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="16"
+      height="16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+      className={className}
+    >
+      <rect x="3" y="7" width="18" height="13" rx="2.5" />
+      <path d="M8.5 7l1.3-2.2h4.4L15.5 7" />
+      <circle cx="12" cy="13.5" r="3.5" />
+    </svg>
   );
 }

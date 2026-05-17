@@ -70,11 +70,14 @@ export interface CanvasImage {
 
 export interface NotePage {
   id: number;
+  /** Legacy plain text body — kept for migration. New saves write `body`. */
   text: string;
+  /** Rich text body as a Tiptap doc (supports markdown shortcuts on input). */
+  body?: TiptapDoc;
   strokes: CanvasStroke[];
   template: 'blank' | 'dotted' | 'lined' | 'grid';
   images?: CanvasImage[];
-  /** Captured at save time so the SVG overlay aligns with the textarea. */
+  /** Captured at save time so the SVG overlay aligns with the editor. */
   w?: number;
   h?: number;
 }

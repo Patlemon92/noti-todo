@@ -18,7 +18,9 @@ import type {
   CanvasTextBox,
   NoteCanvasData,
   NotePage,
+  TiptapDoc,
 } from '../../lib/types';
+import MarkdownEditor from './MarkdownEditor';
 
 type Tool = 'pen' | 'highlighter' | 'eraser' | 'text' | 'lasso';
 type Template = 'blank' | 'dotted' | 'lined' | 'grid';
@@ -45,7 +47,13 @@ interface Props {
 // migration helpers
 // ============================================================================
 function hydratePages(initial?: NoteCanvasData): NotePage[] {
-  if (initial?.pages && initial.pages.length > 0) return initial.pages;
+  if (initial?.pages && initial.pages.length > 0) {
+    // Ensure every page has a body (migrate plain text on first load).
+    return initial.pages.map((p) => ({
+      ...p,
+      body: p.body ?? textToTiptapDoc(p.text ?? ''),
+    }));
+  }
   // legacy single-page hydration: stitch any text_boxes into one flowing text
   if (initial && (initial.strokes || initial.text_boxes)) {
     const text =
@@ -58,6 +66,7 @@ function hydratePages(initial?: NoteCanvasData): NotePage[] {
       {
         id: 1,
         text,
+        body: textToTiptapDoc(text),
         strokes: initial.strokes ?? [],
         template: initial.template ?? 'lined',
         w: initial.w,
@@ -66,7 +75,31 @@ function hydratePages(initial?: NoteCanvasData): NotePage[] {
     ];
   }
   // fresh: one empty page
-  return [{ id: 1, text: '', strokes: [], template: 'lined' }];
+  return [
+    {
+      id: 1,
+      text: '',
+      body: { type: 'doc', content: [{ type: 'paragraph' }] },
+      strokes: [],
+      template: 'lined',
+    },
+  ];
+}
+
+/** Each line of plain text becomes a Tiptap paragraph. */
+function textToTiptapDoc(text: string): TiptapDoc {
+  if (!text || !text.trim()) {
+    return { type: 'doc', content: [{ type: 'paragraph' }] };
+  }
+  const lines = text.split('\n');
+  return {
+    type: 'doc',
+    content: lines.map((line) =>
+      line.trim()
+        ? { type: 'paragraph', content: [{ type: 'text', text: line }] }
+        : { type: 'paragraph' },
+    ),
+  };
 }
 
 // ============================================================================
@@ -293,7 +326,7 @@ export default function NoteCanvas({ initial, onSave }: Props) {
             ⌖
           </ToolIcon>
           <ToolIcon onClick={onPickImage} label="insert image">
-            🖼
+            <PhotoFrameIcon />
           </ToolIcon>
           <input
             ref={imageInputRef}
@@ -406,7 +439,7 @@ export default function NoteCanvas({ initial, onSave }: Props) {
               penSize={penSize}
               hlColor={hlColor}
               hlSize={hlSize}
-              onTextChange={(text) => patchPage(page.id, { text })}
+              onBodyChange={(body) => patchPage(page.id, { body })}
               onStrokesChange={(strokes) => patchPage(page.id, { strokes })}
               onImagesChange={(images) => patchPage(page.id, { images })}
               onTemplateChange={(template) => patchPage(page.id, { template })}
@@ -441,7 +474,7 @@ interface PageSheetProps {
   penSize: number;
   hlColor: string;
   hlSize: number;
-  onTextChange: (text: string) => void;
+  onBodyChange: (body: TiptapDoc) => void;
   onStrokesChange: (strokes: Stroke[]) => void;
   onImagesChange: (images: CanvasImage[]) => void;
   onTemplateChange: (template: Template) => void;
@@ -460,7 +493,7 @@ function PageSheet({
   penSize,
   hlColor,
   hlSize,
-  onTextChange,
+  onBodyChange,
   onStrokesChange,
   onImagesChange,
   onTemplateChange,
@@ -470,7 +503,6 @@ function PageSheet({
   canRemove,
 }: PageSheetProps) {
   const surfaceRef = useRef<HTMLDivElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [current, setCurrent] = useState<Stroke | null>(null);
   const [dims, setDims] = useState({ w: page.w ?? 0, h: page.h ?? 0 });
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
@@ -491,13 +523,6 @@ function PageSheet({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // auto-grow the textarea with its content
-  useEffect(() => {
-    const el = textareaRef.current;
-    if (!el) return;
-    el.style.height = 'auto';
-    el.style.height = el.scrollHeight + 'px';
-  }, [page.text]);
 
   function relPoint(e: ReactPointerEvent<HTMLDivElement>): Pt {
     const r = surfaceRef.current!.getBoundingClientRect();
@@ -804,31 +829,20 @@ function PageSheet({
         )}
         style={paperBgStyle(page.template, lineHeight)}
       >
-        {/* text layer — fills the paper with comfortable margins */}
-        <textarea
-          ref={textareaRef}
-          value={page.text}
-          onChange={(e) => onTextChange(e.target.value)}
-          placeholder={
-            pageNumber === 1
-              ? 'tap and type · switch to pen to draw'
-              : ''
-          }
-          spellCheck
-          className={clsx(
-            'relative block w-full resize-none overflow-hidden bg-transparent text-ink outline-none placeholder:text-ink-faint',
-            tool === 'text' ? 'pointer-events-auto' : 'pointer-events-none',
-          )}
-          style={{
-            padding: '36px 44px',
-            fontSize,
-            lineHeight: `${lineHeight}px`,
-            fontFamily:
-              '"Bricolage Grotesque", system-ui, -apple-system, sans-serif',
-            caretColor: '#2a2520',
-            minHeight: '640px',
-          }}
-        />
+        {/* text layer — Tiptap with markdown shortcuts */}
+        <div className="relative">
+          <MarkdownEditor
+            resetKey={page.id}
+            initial={page.body}
+            onChange={onBodyChange}
+            pointerEnabled={tool === 'text'}
+            placeholder={
+              pageNumber === 1
+                ? 'tap and type · # for heading · - for list · > for quote'
+                : undefined
+            }
+          />
+        </div>
 
         {/* image layer — between text and ink */}
         {(page.images ?? []).map((im) => (
@@ -943,6 +957,26 @@ function PageSheet({
 // ============================================================================
 // helpers
 // ============================================================================
+function PhotoFrameIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="16"
+      height="16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <circle cx="9" cy="10" r="1.5" fill="currentColor" stroke="none" />
+      <path d="M21 16l-5.5-5.5L7 19" />
+    </svg>
+  );
+}
+
 function ToolIcon({
   active,
   onClick,
