@@ -41,7 +41,7 @@ export default function NotesView() {
             <button onClick={newNote} className="btn btn-primary">+ new note</button>
           </div>
         ) : (
-          <ul className="mx-3.5 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          <ul className="mx-3.5 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
             {pages.map((p) => (
               <li key={p.id}>
                 <NoteCard page={p} onOpen={() => nav(`/page/${p.id}`)} />
@@ -62,43 +62,32 @@ export default function NotesView() {
 }
 
 function NoteCard({ page, onOpen }: { page: Page; onOpen: () => void }) {
-  const canvasSvg = (page.properties as NoteProperties | undefined)?.canvas?.svg;
-  const preview = snippet(docToPlaintext(page.body) || page.body_text || '', 110);
+  const canvas = (page.properties as NoteProperties | undefined)?.canvas;
+  const pageCount = canvas?.pages?.length ?? 1;
+  const preview = snippet(docToPlaintext(page.body) || page.body_text || '', 90);
+  // surface first line of typed canvas content as a tile sub-title
+  const canvasFirstLine = canvas?.pages?.[0]?.text?.split('\n')[0]?.trim() ?? '';
+  const subtitle = canvasFirstLine || preview;
+
   return (
     <button
       onClick={onOpen}
-      className="block h-full w-full overflow-hidden rounded-[14px] border-2 border-ink bg-surface text-left shadow-card-sm transition-transform active:translate-x-[1px] active:translate-y-[1px] active:shadow-none"
+      className="group flex aspect-[3/4] h-full w-full flex-col justify-between overflow-hidden rounded-[10px] border-[1.5px] border-ink bg-surface p-2.5 text-left shadow-card-sm transition-transform active:translate-x-[1px] active:translate-y-[1px] active:shadow-none"
     >
-      {canvasSvg ? (
-        <div
-          className="aspect-[4/3] w-full overflow-hidden bg-bg-soft"
-          dangerouslySetInnerHTML={{ __html: scaledSvgForPreview(canvasSvg) }}
-        />
-      ) : null}
-      <div className="px-3.5 py-3">
-        <div className="flex items-baseline justify-between gap-3">
-          <span className="font-serif text-[17px] font-semibold leading-tight">
-            {page.title || 'untitled'}
-          </span>
-          <span className="flex-shrink-0 font-mono text-[11px] uppercase tracking-mono text-ink-soft">
-            {formatDistanceToNowStrict(new Date(page.updated_at), { addSuffix: false })}
-          </span>
+      <div className="min-w-0 flex-1 overflow-hidden">
+        <div className="font-serif text-[14px] font-semibold leading-tight line-clamp-2">
+          {page.title || 'untitled'}
         </div>
-        {!canvasSvg && preview && (
-          <p className="mt-1 text-[13.5px] leading-snug text-ink-soft">{preview}</p>
+        {subtitle && (
+          <p className="mt-1.5 text-[11.5px] leading-snug text-ink-soft line-clamp-3">
+            {subtitle}
+          </p>
         )}
+      </div>
+      <div className="mt-2 flex items-baseline justify-between gap-2 font-mono text-[9.5px] uppercase tracking-mono text-ink-faint">
+        <span>{formatDistanceToNowStrict(new Date(page.updated_at), { addSuffix: false })}</span>
+        {pageCount > 1 && <span>{pageCount} pg</span>}
       </div>
     </button>
   );
-}
-
-function scaledSvgForPreview(raw: string): string {
-  if (!raw) return '';
-  return raw
-    .replace(/<svg([^>]*)\swidth="[^"]*"/, '<svg$1')
-    .replace(/<svg([^>]*)\sheight="[^"]*"/, '<svg$1')
-    .replace(
-      '<svg',
-      '<svg preserveAspectRatio="xMidYMid meet" width="100%" height="100%" style="display:block;max-width:100%;"',
-    );
 }
