@@ -307,9 +307,9 @@ export default function NoteCanvas({ initial, onSave }: Props) {
 
   return (
     <div className="mb-4">
-      {/* sticky slim toolbar */}
-      <div className="sticky top-0 z-20 -mx-1 mb-4 px-1 backdrop-blur-sm">
-        <div className="mx-auto flex max-w-[1500px] items-center gap-0.5 rounded-pill border border-ink/15 bg-bg/90 px-1.5 py-1 shadow-[0_2px_8px_rgba(42,37,32,0.06)]">
+      {/* slim toolbar — no pill chrome, just icons on the cream bg */}
+      <div className="sticky top-0 z-20 mb-2 bg-bg/80 px-3.5 py-1 backdrop-blur-sm">
+        <div className="mx-auto flex max-w-[1500px] items-center gap-0">
           <ToolIcon active={tool === 'text'} onClick={() => { setTool('text'); setShowSettings(false); }} label="text">
             T
           </ToolIcon>
@@ -343,7 +343,7 @@ export default function NoteCanvas({ initial, onSave }: Props) {
                 aria-label="ink settings"
                 title="color · size"
                 className={clsx(
-                  'flex h-8 items-center gap-1.5 rounded-pill border border-ink/20 bg-surface px-2 transition-colors hover:border-ink',
+                  'flex h-7 items-center gap-1.5 rounded-pill border border-ink/20 bg-surface px-2 transition-colors hover:border-ink',
                   showSettings && 'border-ink',
                 )}
               >
@@ -771,15 +771,19 @@ function PageSheet({
 
   return (
     <div className="relative">
-      {/* page header — number + paper picker + delete */}
-      <div className="mb-2 flex items-center justify-between px-1">
-        <span className="font-mono text-[10px] uppercase tracking-mono text-ink-faint">
-          page {pageNumber} / {totalPages}
-        </span>
+      {/* page header — only shown when there's more than one page; otherwise empty */}
+      <div className="mb-1.5 flex h-[18px] items-center justify-between px-1">
+        {totalPages > 1 ? (
+          <span className="font-mono text-[10px] uppercase tracking-mono text-ink-faint">
+            page {pageNumber} / {totalPages}
+          </span>
+        ) : (
+          <span />
+        )}
         <div className="relative flex items-center gap-1">
           <button
             onClick={() => setShowTemplatePicker((v) => !v)}
-            className="rounded-pill px-2 py-0.5 font-mono text-[10px] uppercase tracking-mono text-ink-soft hover:bg-bg-soft hover:text-ink"
+            className="rounded-pill px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-mono text-ink-faint hover:bg-bg-soft hover:text-ink-soft"
           >
             {TEMPLATES.find((t) => t.key === page.template)?.label} ▾
           </button>
@@ -997,7 +1001,7 @@ function ToolIcon({
       title={label}
       aria-label={label}
       className={clsx(
-        'flex h-8 w-8 items-center justify-center rounded-pill font-mono text-[14px] transition-colors',
+        'flex h-7 w-7 items-center justify-center rounded-pill font-mono text-[13px] transition-colors',
         active ? 'bg-peach text-ink' : 'text-ink-soft hover:bg-bg-soft hover:text-ink',
         disabled && 'opacity-40 hover:bg-transparent',
       )}

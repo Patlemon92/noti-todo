@@ -310,7 +310,7 @@ export default function PageView() {
       </div>
 
       {/* title */}
-      <TitleInput value={titleDraft} onChange={onTitleChange} />
+      <TitleInput value={titleDraft} onChange={onTitleChange} compact={isNote} />
 
       {/* task-only stuff */}
       {isTask && (
@@ -475,18 +475,21 @@ export default function PageView() {
 function TitleInput({
   value,
   onChange,
+  compact,
 }: {
   value: string;
   onChange: (v: string) => void;
+  compact?: boolean;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
+  const minH = compact ? 36 : 56;
 
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
     el.style.height = 'auto';
-    el.style.height = Math.max(56, el.scrollHeight) + 'px';
-  }, [value]);
+    el.style.height = Math.max(minH, el.scrollHeight) + 'px';
+  }, [value, minH]);
 
   return (
     <textarea
@@ -495,7 +498,12 @@ function TitleInput({
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder="untitled"
-      className="mx-3.5 mb-5 block w-[calc(100%-28px)] resize-none overflow-hidden border-none bg-transparent p-0 font-serif text-[34px] font-semibold leading-tight tracking-[-0.015em] text-ink outline-none placeholder:text-ink-faint"
+      className={
+        'mx-3.5 block w-[calc(100%-28px)] resize-none overflow-hidden border-none bg-transparent p-0 font-serif font-semibold tracking-[-0.015em] text-ink outline-none placeholder:text-ink-faint ' +
+        (compact
+          ? 'mb-2 text-[22px] leading-tight'
+          : 'mb-5 text-[34px] leading-tight')
+      }
     />
   );
 }
