@@ -4,7 +4,6 @@ import { formatDistanceToNowStrict } from 'date-fns';
 import BottomNav from '../components/ui/BottomNav';
 import TopStrip from '../components/ui/TopStrip';
 import { useFocusTask } from '../hooks/useFocusTask';
-import { useWins } from '../hooks/useWins';
 import { docToPlaintext, snippet } from '../lib/tiptap';
 import { getPage } from '../lib/db';
 import type { Page } from '../lib/types';
@@ -33,7 +32,6 @@ export default function FocusView() {
     resetSkipped,
     reload,
   } = useFocusTask();
-  const { wins, reload: reloadWins } = useWins();
   const [parents, setParents] = useState<Record<string, Page | null>>({});
   const [addOpen, setAddOpen] = useState(false);
   const [snoozePage, setSnoozePage] = useState<Page | null>(null);
@@ -128,7 +126,6 @@ export default function FocusView() {
                 await completeTask(current.id, current.title || 'untitled task');
                 skip(current.id);
                 void reload();
-                void reloadWins();
               }}
               title="done"
               className="rounded-[14px] border-2 border-ink bg-mint px-4 py-3.5 text-[16px] font-bold text-ink shadow-card active:translate-x-[1px] active:translate-y-[1px] active:shadow-none"
@@ -200,39 +197,12 @@ export default function FocusView() {
         </div>
       )}
 
-      {wins.length > 0 && (
-        <div className="mx-3.5 rounded-[18px] border-2 border-ink bg-mint px-4 py-3 shadow-card">
-          <div className="mb-2 flex items-baseline justify-between font-mono text-[14px] uppercase tracking-mono-wide">
-            <span>★ today you did</span>
-            <span className="rounded-md bg-ink px-2 py-0.5 text-[12px] text-bg">
-              {wins.length}
-            </span>
-          </div>
-          {wins.slice(0, 8).map((w, i) => (
-            <div
-              key={w.id}
-              className={
-                'flex items-center gap-2.5 py-1.5 text-[13.5px] font-medium' +
-                (i > 0 ? ' border-t border-dashed border-black/[0.18]' : '')
-              }
-            >
-              <span className="text-[15px]">{glyphFor(w.source_type)}</span>
-              <span className="flex-1">{w.text}</span>
-              <span className="font-mono text-[11px] uppercase tracking-mono text-ink-soft">
-                {formatDistanceToNowStrict(new Date(w.occurred_at), { addSuffix: false })}
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
-
       </div>
       <QuickAddSheet
         open={addOpen}
         onClose={() => setAddOpen(false)}
         onSaved={() => {
           void reload();
-          void reloadWins();
         }}
       />
       <SnoozeSheet
@@ -247,13 +217,6 @@ export default function FocusView() {
       <BottomNav />
     </div>
   );
-}
-
-function glyphFor(t: string) {
-  if (t === 'task_completed') return '✓';
-  if (t === 'checklist_item') return '·';
-  if (t === 'task_deleted') return '✕';
-  return '★';
 }
 
 // ============================================================================

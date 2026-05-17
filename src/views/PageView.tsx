@@ -15,6 +15,7 @@ import BreakDownSheet from '../components/page/BreakDownSheet';
 import ReminderSheet from '../components/page/ReminderSheet';
 import RemindersStrip from '../components/page/RemindersStrip';
 import SnoozeSheet from '../components/page/SnoozeSheet';
+import SketchesSection from '../components/page/SketchesSection';
 import IconButton from '../components/ui/IconButton';
 import { supabase } from '../lib/supabase';
 import {
@@ -359,6 +360,8 @@ export default function PageView() {
           )}
         </div>
       )}
+
+      <SketchesSection pageId={page.id} />
 
       <ChildPages parentId={page.id} parentType={page.type} refreshKey={childrenVersion} />
       <Backlinks pageId={page.id} />
