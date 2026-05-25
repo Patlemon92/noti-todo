@@ -57,6 +57,10 @@ export interface CanvasStroke {
   color: string;
   size: number;
   tool: 'pen' | 'highlighter';
+  /** Pointer type at draw time — finger/mouse strokes get velocity-simulated
+   * pressure for natural taper; apple pencil uses real pressure. Missing on
+   * legacy strokes; treat as 'touch' (the safer default for taper). */
+  inputType?: 'pen' | 'touch' | 'mouse';
 }
 
 export interface CanvasTextBox {

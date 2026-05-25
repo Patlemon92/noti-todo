@@ -1,6 +1,7 @@
 import { NavLink } from 'react-router-dom';
 import clsx from 'clsx';
 import { useCommandPalette } from '../cmd/CommandPalette';
+import { hardRefresh } from '../../lib/hardRefresh';
 
 const ITEMS = [
   { to: '/focus', label: 'focus', icon: '★' },
@@ -70,9 +71,14 @@ export default function Sidebar() {
         </button>
       </div>
 
-      <div className="font-mono text-[10px] uppercase tracking-mono-wide text-ink-faint">
+      <button
+        onClick={hardRefresh}
+        title="hard refresh — unregister sw + clear caches"
+        aria-label="hard refresh"
+        className="rounded-md px-1.5 py-1 font-mono text-[10px] uppercase tracking-mono-wide text-ink-faint transition-colors hover:bg-bg-soft hover:text-ink"
+      >
         v0.1
-      </div>
+      </button>
     </nav>
   );
 }
