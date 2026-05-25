@@ -5,6 +5,7 @@ import { format, isSameDay } from 'date-fns';
 import clsx from 'clsx';
 import BottomNav from '../components/ui/BottomNav';
 import TopStrip from '../components/ui/TopStrip';
+import QuickJournalAdd from '../components/page/QuickJournalAdd';
 import { getJournalBoardId } from '../lib/journalSnaps';
 import { completeTask, listBoardTasks } from '../lib/db';
 import type { Page, TaskProperties } from '../lib/types';
@@ -18,6 +19,7 @@ export default function TodayView() {
   const [tasks, setTasks] = useState<Page[]>([]);
   const [loading, setLoading] = useState(true);
   const [noBoard, setNoBoard] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
 
   const reload = useCallback(async () => {
     try {
@@ -57,7 +59,7 @@ export default function TodayView() {
   return (
     <div className="min-h-[100dvh] pb-32 pt-3">
       <div className="view-grid">
-        <TopStrip />
+        <TopStrip onAdd={() => setAddOpen(true)} />
 
         <div className="flex items-baseline justify-between px-3.5 pb-3">
           <h1 className="font-serif text-[26px] font-semibold leading-none">today</h1>
@@ -98,6 +100,11 @@ export default function TodayView() {
           </div>
         )}
       </div>
+      <QuickJournalAdd
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        onSaved={() => void reload()}
+      />
       <BottomNav />
     </div>
   );
