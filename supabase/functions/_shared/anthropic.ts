@@ -14,11 +14,21 @@ const TONE_RULES = `tone rules — these are absolute:
 - no advice on motivation. just questions or actions
 - prefer 1 specific verb-led instruction over 3 generic ones`;
 
+export interface AnthropicImage {
+  /** Public/signed URL the model can fetch. Use for vision calls. */
+  url?: string;
+  /** Or a base64 data string + its media type (e.g. 'image/jpeg'). */
+  base64?: string;
+  mediaType?: 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif';
+}
+
 export interface AnthropicCall {
   system: string;
   user: string;
   maxTokens: number;
   jsonMode?: boolean; // if true, instruct the model to return strict JSON only
+  /** Optional images to send alongside `user` as vision input. */
+  images?: AnthropicImage[];
 }
 
 export interface AnthropicResult<T = unknown> {
@@ -47,6 +57,30 @@ export async function callAnthropic<T = unknown>(
     .filter(Boolean)
     .join('\n\n');
 
+  // Build user content: images (if any) + text. When images is empty we
+  // pass the bare string to keep the request shape identical to before.
+  const userContent: unknown = opts.images && opts.images.length
+    ? [
+        ...opts.images.map((img) => {
+          if (img.url) {
+            return { type: 'image', source: { type: 'url', url: img.url } };
+          }
+          if (img.base64) {
+            return {
+              type: 'image',
+              source: {
+                type: 'base64',
+                media_type: img.mediaType ?? 'image/jpeg',
+                data: img.base64,
+              },
+            };
+          }
+          throw new Error('image must have url or base64');
+        }),
+        { type: 'text', text: opts.user },
+      ]
+    : opts.user;
+
   const res = await fetch(ANTHROPIC_URL, {
     method: 'POST',
     headers: {
@@ -58,7 +92,7 @@ export async function callAnthropic<T = unknown>(
       model: MODEL,
       max_tokens: opts.maxTokens,
       system: systemFinal,
-      messages: [{ role: 'user', content: opts.user }],
+      messages: [{ role: 'user', content: userContent }],
     }),
   });
 
