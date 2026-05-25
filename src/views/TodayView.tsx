@@ -113,6 +113,23 @@ interface Groups {
   looseEnds: Page[];    // no due_at
 }
 
+/** props on extracted tasks; due_date is the journal-pivot's date-only field. */
+type ExtractedProps = TaskProperties & { due_date?: string };
+
+function effectiveDate(props: ExtractedProps): Date | null {
+  if (props.due_at) {
+    const d = new Date(props.due_at);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  if (props.due_date) {
+    // interpret as local-midnight that day so day comparisons work
+    const [y, m, d] = props.due_date.split('-').map((s) => parseInt(s, 10));
+    if (!y || !m || !d) return null;
+    return new Date(y, m - 1, d, 0, 0, 0, 0);
+  }
+  return null;
+}
+
 function groupByDue(tasks: Page[]): Groups {
   const now = new Date();
   const endOfToday = new Date(now);
@@ -125,16 +142,15 @@ function groupByDue(tasks: Page[]): Groups {
   const looseEnds: Page[] = [];
 
   for (const t of tasks) {
-    const props = (t.properties as TaskProperties | undefined) ?? {};
-    const dueAt = props.due_at ? new Date(props.due_at) : null;
-    if (!dueAt || isNaN(dueAt.getTime())) {
+    const props = (t.properties as ExtractedProps | undefined) ?? {};
+    const eff = effectiveDate(props);
+    if (!eff) {
       looseEnds.push(t);
-    } else if (dueAt.getTime() <= endOfToday.getTime()) {
+    } else if (eff.getTime() <= endOfToday.getTime()) {
       todayPokes.push(t);
-    } else if (dueAt.getTime() <= endOfWeek.getTime()) {
+    } else if (eff.getTime() <= endOfWeek.getTime()) {
       upcoming.push(t);
     } else {
-      // further out — bucket with upcoming for now; can split later
       upcoming.push(t);
     }
   }
@@ -147,8 +163,10 @@ function groupByDue(tasks: Page[]): Groups {
 }
 
 function byDueAsc(a: Page, b: Page): number {
-  const ad = (a.properties as TaskProperties)?.due_at ?? '';
-  const bd = (b.properties as TaskProperties)?.due_at ?? '';
+  const ap = (a.properties as ExtractedProps) ?? {};
+  const bp = (b.properties as ExtractedProps) ?? {};
+  const ad = ap.due_at ?? ap.due_date ?? '';
+  const bd = bp.due_at ?? bp.due_date ?? '';
   return ad < bd ? -1 : ad > bd ? 1 : 0;
 }
 
@@ -176,8 +194,14 @@ function TaskRow({
   onComplete: (p: Page) => void;
   dueTone: 'today' | 'upcoming' | 'loose';
 }) {
-  const props = (page.properties as TaskProperties | undefined) ?? {};
+  const props = (page.properties as ExtractedProps | undefined) ?? {};
   const due = props.due_at ? new Date(props.due_at) : null;
+  const dateOnly = !due && props.due_date
+    ? (() => {
+        const [y, m, d] = props.due_date.split('-').map((s) => parseInt(s, 10));
+        return y && m && d ? new Date(y, m - 1, d) : null;
+      })()
+    : null;
   const now = new Date();
 
   let dueLabel = '';
@@ -188,6 +212,14 @@ function TaskRow({
       dueLabel = `from ${format(due, 'EEE d MMM').toLowerCase()}`;
     } else {
       dueLabel = format(due, 'EEE d MMM · h:mma').toLowerCase();
+    }
+  } else if (dateOnly && !isNaN(dateOnly.getTime())) {
+    if (isSameDay(dateOnly, now)) {
+      dueLabel = 'today · no time';
+    } else if (dateOnly < now) {
+      dueLabel = `from ${format(dateOnly, 'EEE d MMM').toLowerCase()}`;
+    } else {
+      dueLabel = format(dateOnly, 'EEE d MMM').toLowerCase();
     }
   }
 

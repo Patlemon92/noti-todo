@@ -253,24 +253,17 @@ export async function getOrCreateJournalBoard(): Promise<string> {
 
 /**
  * Build an ISO due_at from a snap-extracted resolved_date + time in the
- * caller's local timezone. resolved_date is "yyyy-mm-dd" (UTC calendar
- * day); we interpret it as a local date and combine with hour/minute to
- * produce a real Date → ISO.
+ * caller's local timezone. Only call this when `time` is present — items
+ * with a date but no time should use `properties.due_date` (the bare
+ * yyyy-mm-dd) instead, so they don't silently fire a push at a defaulted
+ * 9am the user never asked for.
  */
 export function buildDueAt(
   resolvedDate: string,
-  time: { hour: number; minute: number } | null,
+  time: { hour: number; minute: number },
 ): string {
   const [y, m, d] = resolvedDate.split('-').map((s) => parseInt(s, 10));
-  const local = new Date(
-    y,
-    (m ?? 1) - 1,
-    d ?? 1,
-    time?.hour ?? 9,
-    time?.minute ?? 0,
-    0,
-    0,
-  );
+  const local = new Date(y, (m ?? 1) - 1, d ?? 1, time.hour, time.minute, 0, 0);
   return local.toISOString();
 }
 
@@ -317,14 +310,24 @@ export async function saveExtractedItems(
   }
 
   for (const item of items) {
-    const props: TaskProperties & { raw_text?: string; from_snap?: string } = {
+    const props: TaskProperties & {
+      raw_text?: string;
+      from_snap?: string;
+      due_date?: string;
+    } = {
       raw_text: item.raw_text,
       from_snap: snap.id,
     };
+
+    // due_at = real ISO (with time) — drives push notifications.
+    // due_date = bare yyyy-mm-dd — drives grouping but never pings.
+    // never both: time present → due_at; time absent → due_date.
     let dueAt: string | null = null;
-    if (item.resolved_date) {
+    if (item.resolved_date && item.time) {
       dueAt = buildDueAt(item.resolved_date, item.time);
       props.due_at = dueAt;
+    } else if (item.resolved_date) {
+      props.due_date = item.resolved_date;
     }
 
     const page = await createPage({
@@ -335,9 +338,8 @@ export async function saveExtractedItems(
     });
     result.itemsCreated++;
 
-    // create a reminder so the existing push pipeline picks it up.
-    // we attach reminders only when category === 'reminder' AND we have a
-    // due_at — bare tasks just sit in loose-ends.
+    // push only fires when the user gave us a real time. date-only
+    // items still appear under today in the view; they just don't ping.
     if (item.category === 'reminder' && dueAt) {
       await createReminder({
         page_id: page.id,
