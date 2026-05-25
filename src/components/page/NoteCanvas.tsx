@@ -30,6 +30,11 @@ const PEN_COLORS = ['#2a2520', '#e88562', '#7fb389', '#8db4c8', '#a896d4', '#e8c
 const HL_COLORS = ['#fbeb5b', '#a3e3a3', '#9dc6e8', '#f4a3a3', '#e3b8f5', '#ffb37b'];
 const PEN_SIZES = [2, 4, 7, 12];
 const HL_SIZES = [14, 22, 32];
+/** App-level palm rejection window. Touches that arrive within this many ms
+ * of the last Apple Pencil event are ignored. Long enough to cover a palm
+ * landing between strokes, short enough that putting the Pencil down and
+ * finger-drawing within ~2s still works. */
+const PEN_DOMINANCE_MS = 1500;
 
 const TEMPLATES: Array<{ key: Template; label: string }> = [
   { key: 'blank', label: 'blank' },
@@ -241,7 +246,7 @@ export default function NoteCanvas({ initial, onSave }: Props) {
     );
     const paths = sorted
       .map((s) => {
-        const d = svgPathFromStroke(s.points, s.size);
+        const d = svgPathFromStroke(s.points, s.size, s.inputType, s.tool);
         if (!d) return '';
         return `<path d="${d}" fill="${s.color}" opacity="${s.tool === 'highlighter' ? 0.4 : 1}" />`;
       })
@@ -392,6 +397,35 @@ export default function NoteCanvas({ initial, onSave }: Props) {
                         }}
                       />
                     ))}
+                    {/* custom color — opens native picker. swatch shows the
+                     * current custom pick when it isn't one of the presets,
+                     * otherwise shows a small rainbow hint. */}
+                    <label
+                      className={clsx(
+                        'relative flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border-2 transition-transform',
+                        !activeColors.includes(activeColor) ? 'border-ink scale-110' : 'border-ink/20',
+                      )}
+                      title="custom colour"
+                      aria-label="custom colour"
+                      style={{
+                        background: !activeColors.includes(activeColor)
+                          ? activeColor
+                          : 'conic-gradient(from 0deg, #e88562, #e8c75f, #7fb389, #8db4c8, #a896d4, #e88562)',
+                        opacity: tool === 'highlighter' && !activeColors.includes(activeColor) ? 0.65 : 1,
+                      }}
+                    >
+                      <input
+                        type="color"
+                        value={activeColor}
+                        onChange={(e) => setActiveColor(e.target.value)}
+                        className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                      />
+                      {activeColors.includes(activeColor) && (
+                        <span className="pointer-events-none text-[12px] leading-none text-ink mix-blend-difference">
+                          +
+                        </span>
+                      )}
+                    </label>
                   </div>
                   <div className="flex items-center gap-1">
                     {activeSizes.map((s) => (
@@ -515,6 +549,26 @@ function PageSheet({
   const [current, setCurrent] = useState<Stroke | null>(null);
   const [dims, setDims] = useState({ w: page.w ?? 0, h: page.h ?? 0 });
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
+
+  // Active pointers — used to detect a second finger landing so we can cancel
+  // the in-progress stroke and hand the gesture to a manual two-finger scroll.
+  // touch-action: none on the surface kills the browser's own gesture handling
+  // (needed for one-finger drawing), so without this we lose page scrolling
+  // entirely while a drawing tool is active.
+  const activePointersRef = useRef<
+    Map<number, { y: number; type: string }>
+  >(new Map());
+  const twoFingerScrollRef = useRef<{ lastY: number } | null>(null);
+  // The pointerId that owns the current stroke. Used to reject move/up
+  // events from other pointers (e.g. a palm dragging across the screen
+  // while the pencil is mid-stroke).
+  const strokePointerIdRef = useRef<number | null>(null);
+  // Timestamp of the last Apple Pencil event. While a pen is "recently
+  // active" (within PEN_DOMINANCE_MS), all touch pointers are rejected at
+  // the app level — iOS's own palm rejection isn't perfect and palms slip
+  // through as touch events, cancelling pen strokes. Procreate / GoodNotes
+  // do the same.
+  const lastPenAtRef = useRef<number>(0);
 
   // measure
   useEffect(() => {
@@ -692,7 +746,45 @@ function PageSheet({
   function onPointerDown(e: ReactPointerEvent<HTMLDivElement>) {
     if (tool === 'text') return; // textarea handles its own pointers
     if (e.button !== 0 && e.pointerType !== 'pen' && e.pointerType !== 'touch') return;
-    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+
+    // App-level pen dominance. The moment a Pencil lands, abandon any
+    // touch-derived state (phantom palms, stuck two-finger scrolls) — the
+    // user has committed to drawing with the Pencil.
+    if (e.pointerType === 'pen') {
+      lastPenAtRef.current = Date.now();
+      activePointersRef.current.clear();
+      twoFingerScrollRef.current = null;
+    }
+
+    // Track active pointers (touch only — pen + mouse never multi-touch).
+    if (e.pointerType === 'touch') {
+      // Pencil-recently-active → this touch is almost certainly a palm.
+      // Reject entirely (don't track, don't draw, don't scroll).
+      if (Date.now() - lastPenAtRef.current < PEN_DOMINANCE_MS) return;
+      // Pencil mid-stroke (race against the time window) → still reject.
+      if (strokePointerIdRef.current !== null) return;
+      activePointersRef.current.set(e.pointerId, {
+        y: e.clientY,
+        type: e.pointerType,
+      });
+      // Second finger landed → cancel current stroke, hand off to manual scroll.
+      const touches = Array.from(activePointersRef.current.values()).filter(
+        (p) => p.type === 'touch',
+      );
+      if (touches.length >= 2) {
+        setCurrent(null);
+        setLassoPoints([]);
+        setDragStart(null);
+        const midY = touches.reduce((a, b) => a + b.y, 0) / touches.length;
+        twoFingerScrollRef.current = { lastY: midY };
+        return;
+      }
+    }
+
+    // Capture on currentTarget (the surface div) — not e.target, which can
+    // resolve to a descendant in some browsers even with pointer-events:none.
+    // Wrong-target capture loses move events partway through a stroke.
+    e.currentTarget.setPointerCapture?.(e.pointerId);
     const r = surfaceRef.current!.getBoundingClientRect();
     const p: [number, number] = [e.clientX - r.left, e.clientY - r.top];
 
@@ -715,16 +807,40 @@ function PageSheet({
     }
 
     const isHl = tool === 'highlighter';
+    const inputType: 'pen' | 'touch' | 'mouse' =
+      e.pointerType === 'pen'
+        ? 'pen'
+        : e.pointerType === 'mouse'
+          ? 'mouse'
+          : 'touch';
+    strokePointerIdRef.current = e.pointerId;
     setCurrent({
       id: nextStrokeId(),
       points: [relPoint(e)],
       color: isHl ? hlColor : penColor,
       size: isHl ? hlSize : penSize,
       tool: isHl ? 'highlighter' : 'pen',
+      inputType,
     });
   }
 
   function onPointerMove(e: ReactPointerEvent<HTMLDivElement>) {
+    // Two-finger scroll mode — pan the window by the midpoint delta.
+    if (twoFingerScrollRef.current && e.pointerType === 'touch') {
+      const tracked = activePointersRef.current.get(e.pointerId);
+      if (tracked) tracked.y = e.clientY;
+      const touches = Array.from(activePointersRef.current.values()).filter(
+        (p) => p.type === 'touch',
+      );
+      if (touches.length >= 2) {
+        const midY = touches.reduce((a, b) => a + b.y, 0) / touches.length;
+        const dy = midY - twoFingerScrollRef.current.lastY;
+        if (dy !== 0) window.scrollBy(0, -dy);
+        twoFingerScrollRef.current.lastY = midY;
+      }
+      return;
+    }
+
     if (tool === 'text') return;
     if (tool === 'eraser') {
       if (e.buttons === 0 && e.pointerType !== 'pen') return;
@@ -747,12 +863,36 @@ function PageSheet({
       return;
     }
     if (!current) return;
+    // Ignore moves from any pointer that didn't start this stroke (palm
+    // dragging while pencil writes, second finger drifting, etc.).
+    if (strokePointerIdRef.current !== null && e.pointerId !== strokePointerIdRef.current) return;
     if (e.buttons === 0 && e.pointerType !== 'pen') return;
+    if (e.pointerType === 'pen') lastPenAtRef.current = Date.now();
     setCurrent((c) => (c ? { ...c, points: [...c.points, relPoint(e)] } : c));
   }
 
   function onPointerEnd(e: ReactPointerEvent<HTMLDivElement>) {
-    (e.target as HTMLElement).releasePointerCapture?.(e.pointerId);
+    e.currentTarget.releasePointerCapture?.(e.pointerId);
+
+    if (e.pointerType === 'pen') {
+      // Refresh the dominance window so palms between letters still get
+      // rejected. Without this, a palm landing 200ms after pen-up would be
+      // accepted and trigger a phantom stroke or two-finger scroll.
+      lastPenAtRef.current = Date.now();
+    }
+
+    if (e.pointerType === 'touch') {
+      activePointersRef.current.delete(e.pointerId);
+    }
+
+    if (twoFingerScrollRef.current) {
+      const touches = Array.from(activePointersRef.current.values()).filter(
+        (p) => p.type === 'touch',
+      );
+      if (touches.length < 2) twoFingerScrollRef.current = null;
+      return;
+    }
+
     if (tool === 'lasso') {
       if (dragStart) {
         setDragStart(null);
@@ -763,10 +903,16 @@ function PageSheet({
     }
     if (tool === 'eraser' || tool === 'text') return;
     if (!current) return;
-    if (current.points.length > 1) {
+    // Only finalize if this is the stroke-owning pointer lifting.
+    if (strokePointerIdRef.current !== null && e.pointerId !== strokePointerIdRef.current) return;
+    // Save even a single-point stroke — it renders as a felt-tip dot.
+    // Previously dropped 1-point strokes meant quick taps (dotting i's,
+    // periods) just vanished.
+    if (current.points.length >= 1) {
       onStrokesChange([...page.strokes, current]);
     }
     setCurrent(null);
+    strokePointerIdRef.current = null;
   }
 
   const allStrokes = current ? [...page.strokes, current] : page.strokes;
@@ -835,14 +981,27 @@ function PageSheet({
         onPointerUp={onPointerEnd}
         onPointerCancel={onPointerEnd}
         className={clsx(
-          'relative min-h-[640px] touch-none overflow-hidden rounded-[6px] border border-ink/15 bg-surface shadow-[0_8px_28px_rgba(42,37,32,0.10),0_2px_4px_rgba(42,37,32,0.06)]',
+          'relative min-h-[640px] overflow-hidden rounded-[6px] border border-ink/15 bg-surface shadow-[0_8px_28px_rgba(42,37,32,0.10),0_2px_4px_rgba(42,37,32,0.06)]',
           tool === 'eraser' && 'cursor-crosshair',
           tool === 'text' && 'cursor-text',
         )}
-        style={paperBgStyle(page.template, lineHeight)}
+        style={{
+          ...paperBgStyle(page.template, lineHeight),
+          // text mode: full browser gestures (selection, scroll, zoom).
+          // drawing modes: kill browser gestures so one-finger draws cleanly;
+          // two-finger scroll is handled manually in onPointerMove.
+          touchAction: tool === 'text' ? 'auto' : 'none',
+        }}
       >
-        {/* text layer — Tiptap with markdown shortcuts */}
-        <div className="relative">
+        {/* text layer — Tiptap with markdown shortcuts.
+         * The wrapper takes pointer-events: none whenever a drawing tool is
+         * active so strokes pass cleanly through to the surface handler. Setting
+         * it only on the inner contenteditable wasn't enough — Tiptap's outer
+         * wrapper still caught some events and dropped strokes mid-line. */}
+        <div
+          className="relative"
+          style={{ pointerEvents: tool === 'text' ? 'auto' : 'none' }}
+        >
           <MarkdownEditor
             resetKey={page.id}
             initial={page.body}
@@ -885,7 +1044,7 @@ function PageSheet({
           className="pointer-events-none absolute inset-0"
         >
           {sortedStrokes.map((s) => {
-            const d = svgPathFromStroke(s.points, s.size);
+            const d = svgPathFromStroke(s.points, s.size, s.inputType, s.tool);
             if (!d) return null;
             return (
               <path
@@ -1109,15 +1268,32 @@ function buildPaperBgSvg(template: Template, w: number, h: number): string {
   return '';
 }
 
-function svgPathFromStroke(points: Pt[], size: number): string {
-  if (points.length < 2) return '';
+function svgPathFromStroke(
+  points: Pt[],
+  size: number,
+  inputType: 'pen' | 'touch' | 'mouse' = 'touch',
+  tool: 'pen' | 'highlighter' = 'pen',
+): string {
+  if (points.length === 0) return '';
+  // Single-point tap → render as a filled circle so quick dots (full stops,
+  // dotted i's) actually show up instead of vanishing.
+  if (points.length === 1) {
+    const [x, y] = points[0];
+    const r = size / 2;
+    return `M${(x - r).toFixed(2)} ${y.toFixed(2)} a${r} ${r} 0 1 0 ${(2 * r).toFixed(2)} 0 a${r} ${r} 0 1 0 ${(-2 * r).toFixed(2)} 0 Z`;
+  }
+  // Felt-tip pen + highlighter: uniform width, round caps, no calligraphic
+  // taper. No pressure response — finger/pencil/mouse all draw a consistent
+  // marker line.
   const stroke = getStroke(points, {
     size,
-    thinning: 0.55,
+    thinning: 0,
     smoothing: 0.5,
-    streamline: 0.5,
+    streamline: tool === 'highlighter' ? 0.4 : 0.5,
     simulatePressure: false,
     last: true,
+    start: { taper: 0, cap: true },
+    end: { taper: 0, cap: true },
   });
   if (stroke.length === 0) return '';
   let d = '';

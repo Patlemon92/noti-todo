@@ -2,6 +2,8 @@ import { useEffect } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import AuthView from './views/AuthView';
+import TodayView from './views/TodayView';
+import SnapView from './views/SnapView';
 import FocusView from './views/FocusView';
 import PageView from './views/PageView';
 import BoardsView from './views/BoardsView';
@@ -24,7 +26,7 @@ function Protected({ children }: { children: JSX.Element }) {
 function PublicOnly({ children }: { children: JSX.Element }) {
   const { session, loading } = useAuth();
   if (loading) return <FullPageLoader />;
-  if (session) return <Navigate to="/focus" replace />;
+  if (session) return <Navigate to="/today" replace />;
   return children;
 }
 
@@ -54,6 +56,23 @@ export default function App() {
               </PublicOnly>
             }
           />
+          <Route
+            path="/today"
+            element={
+              <Protected>
+                <TodayView />
+              </Protected>
+            }
+          />
+          <Route
+            path="/snap"
+            element={
+              <Protected>
+                <SnapView />
+              </Protected>
+            }
+          />
+          {/* pre-pivot routes — hidden from the nav, kept reachable by URL */}
           <Route
             path="/focus"
             element={
@@ -110,7 +129,7 @@ export default function App() {
               </Protected>
             }
           />
-          <Route path="*" element={<Navigate to="/focus" replace />} />
+          <Route path="*" element={<Navigate to="/today" replace />} />
         </Routes>
         </main>
         <InstallPrompt />

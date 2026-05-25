@@ -114,12 +114,28 @@ export default function PageView() {
     return undefined;
   }, [isNote]);
 
-  // Scroll the window to the top whenever the page id changes, otherwise
-  // notes (with their tall canvases) inherit the scroll position from the
-  // previous view and appear to open at the bottom.
+  // Tasks/boards/plain pages open at the top. Notes open at the bottom —
+  // writing continues where you left off, and the most-recent page is what
+  // you came back to read. We wait for the canvas to lay out (two RAFs)
+  // before scrolling so the height is correct.
   useEffect(() => {
+    if (!page) {
+      window.scrollTo({ top: 0, behavior: 'auto' });
+      return;
+    }
+    if (isNote) {
+      const raf1 = requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          window.scrollTo({
+            top: document.documentElement.scrollHeight,
+            behavior: 'auto',
+          });
+        });
+      });
+      return () => cancelAnimationFrame(raf1);
+    }
     window.scrollTo({ top: 0, behavior: 'auto' });
-  }, [id]);
+  }, [page?.id, isNote]);
   const taskProps = (page?.properties as TaskProperties | undefined) ?? {};
   const checklist: ChecklistItem[] = taskProps.checklist ?? [];
   const noteProps = (page?.properties as NoteProperties | undefined) ?? {};
