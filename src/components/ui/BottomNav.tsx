@@ -1,10 +1,9 @@
-import { NavLink } from 'react-router-dom';
+import { NavLink, Link } from 'react-router-dom';
 import clsx from 'clsx';
 import { hardRefresh } from '../../lib/hardRefresh';
 
 const ITEMS = [
-  { to: '/focus', label: 'focus', icon: '★' },
-  { to: '/boards', label: 'boards', icon: '▦' },
+  { to: '/today', label: 'today', icon: '✦' },
   { to: '/notes', label: 'notes', icon: '✎' },
   { to: '/profile', label: 'you', icon: '◉' },
 ] as const;
@@ -34,6 +33,17 @@ export default function BottomNav() {
           </NavLink>
         ))}
       </nav>
+
+      {/* snap FAB — primary action post-pivot. coexists with the centered
+       * nav pill and the bottom-left hardRefresh chip. */}
+      <Link
+        to="/snap"
+        title="snap a journal page"
+        aria-label="snap a journal page"
+        className="fixed bottom-[16px] right-[14px] z-50 flex h-[52px] w-[52px] items-center justify-center rounded-[18px] border-2 border-ink bg-peach-deep text-[22px] text-ink shadow-card-lg transition-transform active:translate-x-[1px] active:translate-y-[1px] active:shadow-card md:hidden"
+      >
+        <span aria-hidden>✦</span>
+      </Link>
 
       {/* hard-refresh chip — matches the desktop sidebar's v0.1 corner.
        * sits bottom-left of the viewport so the centered nav pill stays clean. */}

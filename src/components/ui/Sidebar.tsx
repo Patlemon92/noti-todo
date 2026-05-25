@@ -4,8 +4,7 @@ import { useCommandPalette } from '../cmd/CommandPalette';
 import { hardRefresh } from '../../lib/hardRefresh';
 
 const ITEMS = [
-  { to: '/focus', label: 'focus', icon: '★' },
-  { to: '/boards', label: 'boards', icon: '▦' },
+  { to: '/today', label: 'today', icon: '✦' },
   { to: '/notes', label: 'notes', icon: '✎' },
   { to: '/profile', label: 'you', icon: '◉' },
 ] as const;
@@ -57,6 +56,26 @@ export default function Sidebar() {
         ))}
 
         <div className="my-1 h-px w-7 bg-ink/15" />
+
+        {/* snap — primary action post-pivot. visually heavier than the nav
+         * items so it reads as the app's headline verb. */}
+        <NavLink
+          to="/snap"
+          title="snap a journal page"
+          className={({ isActive }) =>
+            clsx(
+              'group relative flex h-[44px] w-[44px] items-center justify-center rounded-[12px] border-2 border-ink bg-peach-deep text-[18px] text-ink transition-transform',
+              isActive
+                ? 'shadow-card-sm'
+                : 'shadow-card-sm hover:translate-y-[-1px]',
+            )
+          }
+        >
+          <span aria-hidden>✦</span>
+          <span className="pointer-events-none absolute left-full ml-2 hidden whitespace-nowrap rounded-md border border-ink bg-ink px-2 py-1 font-mono text-[10px] uppercase tracking-mono text-bg group-hover:block">
+            snap
+          </span>
+        </NavLink>
 
         <button
           onClick={cmd.open}
