@@ -42,29 +42,29 @@ export interface JournalSnap {
 }
 
 /**
+ * Heuristic check for HEIC/HEIF — browsers other than Safari can't decode
+ * these without a polyfill. Check both file.type (when the OS sets it
+ * correctly) and the extension (when it doesn't).
+ */
+export function isHeic(file: File): boolean {
+  const type = (file.type || '').toLowerCase();
+  if (type.includes('heic') || type.includes('heif')) return true;
+  const name = file.name.toLowerCase();
+  return name.endsWith('.heic') || name.endsWith('.heif');
+}
+
+/**
  * Downscale to max 1600px on the longest side, encode as JPEG ~0.82.
- * Uses `createImageBitmap` with `imageOrientation: 'from-image'` so EXIF
- * rotation from iPhone shots actually sticks.
+ * Tries a few decode paths before giving up so EXIF rotation sticks on
+ * mobile safari AND chrome/firefox on desktop, including odd cases where
+ * `createImageBitmap` with the `imageOrientation` option throws.
  */
 export async function resizeToJpeg(
   file: File,
   maxLong = 1600,
   quality = 0.82,
 ): Promise<Blob> {
-  let bitmap: ImageBitmap;
-  try {
-    bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
-  } catch {
-    // older safari without the option — fall back to <img> decode (browser
-    // applies orientation for the displayed image, canvas inherits that)
-    const url = URL.createObjectURL(file);
-    try {
-      const img = await loadImage(url);
-      bitmap = await createImageBitmap(img);
-    } finally {
-      URL.revokeObjectURL(url);
-    }
-  }
+  const bitmap = await decodeImage(file);
 
   const ratio = Math.min(1, maxLong / Math.max(bitmap.width, bitmap.height));
   const w = Math.round(bitmap.width * ratio);
@@ -75,7 +75,7 @@ export async function resizeToJpeg(
   canvas.height = h;
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('canvas 2d context unavailable');
-  ctx.drawImage(bitmap, 0, 0, w, h);
+  ctx.drawImage(bitmap as CanvasImageSource, 0, 0, w, h);
 
   const blob = await new Promise<Blob | null>((resolve) =>
     canvas.toBlob(resolve, 'image/jpeg', quality),
@@ -84,11 +84,38 @@ export async function resizeToJpeg(
   return blob;
 }
 
+/**
+ * Decode a File into something drawable. Returns ImageBitmap or
+ * HTMLImageElement — both work with canvas drawImage.
+ */
+async function decodeImage(file: File): Promise<ImageBitmap | HTMLImageElement> {
+  // Path A — createImageBitmap with orientation hint (modern chrome/safari).
+  try {
+    return await createImageBitmap(file, { imageOrientation: 'from-image' });
+  } catch {
+    // Path B — createImageBitmap without the option (older safari).
+    try {
+      return await createImageBitmap(file);
+    } catch {
+      // Path C — Image element decode (last resort, lossy on EXIF in some browsers).
+      const url = URL.createObjectURL(file);
+      try {
+        return await loadImage(url);
+      } finally {
+        // revoke a tick later so the canvas can still read it
+        setTimeout(() => URL.revokeObjectURL(url), 0);
+      }
+    }
+  }
+}
+
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
+    img.decoding = 'async';
     img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error('image decode failed'));
+    img.onerror = () =>
+      reject(new Error('image decode failed (browser may not support this file type)'));
     img.src = src;
   });
 }

@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Camera } from 'lucide-react';
 import BottomNav from '../components/ui/BottomNav';
 import TopStrip from '../components/ui/TopStrip';
-import { createSnap, invokeExtraction } from '../lib/journalSnaps';
+import { createSnap, invokeExtraction, isHeic } from '../lib/journalSnaps';
 
 type Mode = 'pick' | 'preview' | 'uploading' | 'error';
 
@@ -29,11 +29,44 @@ export default function SnapView() {
   function onFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
     if (e.target) e.target.value = '';
-    if (!f || !f.type.startsWith('image/')) return;
+    if (!f) return;
+
+    // HEIC/HEIF only decodes natively on iOS/iPadOS Safari. On desktop
+    // chrome / firefox / non-safari it dies silently — pre-empt with a
+    // specific message instead of a generic "image decode failed".
+    if (isHeic(f) && !canBrowserDecodeHeic()) {
+      setFile(null);
+      setPreviewUrl(null);
+      setError(
+        "this looks like a HEIC file — chrome and firefox can't read those. " +
+          'snap from your iphone/ipad PWA (HEIC works there), or export ' +
+          'this photo as JPEG and try again.',
+      );
+      setMode('error');
+      return;
+    }
+
+    if (!f.type.startsWith('image/') && !isHeic(f)) {
+      setError(`expected an image — got ${f.type || 'unknown type'}.`);
+      setMode('error');
+      return;
+    }
+
     setFile(f);
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setPreviewUrl(URL.createObjectURL(f));
     setMode('preview');
+  }
+
+  function canBrowserDecodeHeic(): boolean {
+    // Safari (desktop + mobile) is the only common browser that decodes HEIC
+    // natively. iOS Chrome is actually Safari WebKit under the hood, so it
+    // also works there. We sniff via the UA — a heuristic, but right
+    // overwhelmingly often.
+    const ua = navigator.userAgent;
+    const isSafari = /Safari/.test(ua) && !/Chrome|CriOS|FxiOS/.test(ua);
+    const isIOS = /iPhone|iPad|iPod/.test(ua);
+    return isSafari || isIOS;
   }
 
   function retake() {
@@ -60,8 +93,9 @@ export default function SnapView() {
       nav(`/snap/${snap.id}`);
     } catch (err) {
       // eslint-disable-next-line no-console
-      console.error('[snap upload]', err);
-      setError(err instanceof Error ? err.message : 'upload failed');
+      console.error('[snap upload]', err, 'file:', { name: file.name, type: file.type, size: file.size });
+      const baseMsg = err instanceof Error ? err.message : 'upload failed';
+      setError(`${baseMsg} (file: ${file.type || 'unknown'}, ${Math.round(file.size / 1024)}KB)`);
       setMode('error');
     }
   }
