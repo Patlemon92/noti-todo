@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import clsx from 'clsx';
+import { Camera } from 'lucide-react';
 import { useCommandPalette } from '../cmd/CommandPalette';
 import { hardRefresh } from '../../lib/hardRefresh';
 
@@ -64,14 +65,14 @@ export default function Sidebar() {
           title="snap a journal page"
           className={({ isActive }) =>
             clsx(
-              'group relative flex h-[44px] w-[44px] items-center justify-center rounded-[12px] border-2 border-ink bg-peach-deep text-[18px] text-ink transition-transform',
+              'group relative flex h-[44px] w-[44px] items-center justify-center rounded-[12px] border-2 border-ink bg-peach-deep text-ink transition-transform',
               isActive
                 ? 'shadow-card-sm'
                 : 'shadow-card-sm hover:translate-y-[-1px]',
             )
           }
         >
-          <span aria-hidden>✦</span>
+          <Camera size={20} strokeWidth={2.25} aria-hidden />
           <span className="pointer-events-none absolute left-full ml-2 hidden whitespace-nowrap rounded-md border border-ink bg-ink px-2 py-1 font-mono text-[10px] uppercase tracking-mono text-bg group-hover:block">
             snap
           </span>

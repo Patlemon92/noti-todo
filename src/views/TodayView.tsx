@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { Camera } from 'lucide-react';
 import BottomNav from '../components/ui/BottomNav';
 import TopStrip from '../components/ui/TopStrip';
 
@@ -32,9 +33,9 @@ export default function TodayView() {
           </p>
           <Link
             to="/snap"
-            className="inline-flex items-center gap-1.5 rounded-[14px] border-2 border-ink bg-peach-deep px-4 py-2 font-sans text-[14px] font-semibold text-ink shadow-card transition-transform active:translate-x-[1px] active:translate-y-[1px] active:shadow-card-sm"
+            className="inline-flex items-center gap-2 rounded-[14px] border-2 border-ink bg-peach-deep px-4 py-2 font-sans text-[14px] font-semibold text-ink shadow-card transition-transform active:translate-x-[1px] active:translate-y-[1px] active:shadow-card-sm"
           >
-            <span aria-hidden>✦</span>
+            <Camera size={18} strokeWidth={2.25} aria-hidden />
             <span>snap a page</span>
           </Link>
         </div>

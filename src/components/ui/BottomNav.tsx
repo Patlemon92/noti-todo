@@ -1,5 +1,6 @@
 import { NavLink, Link } from 'react-router-dom';
 import clsx from 'clsx';
+import { Camera } from 'lucide-react';
 import { hardRefresh } from '../../lib/hardRefresh';
 
 const ITEMS = [
@@ -35,14 +36,17 @@ export default function BottomNav() {
       </nav>
 
       {/* snap FAB — primary action post-pivot. coexists with the centered
-       * nav pill and the bottom-left hardRefresh chip. */}
+       * nav pill and the bottom-left hardRefresh chip.
+       * bottom offset respects iPhone safe area so the home indicator
+       * doesn't clip it. */}
       <Link
         to="/snap"
         title="snap a journal page"
         aria-label="snap a journal page"
-        className="fixed bottom-[16px] right-[14px] z-50 flex h-[52px] w-[52px] items-center justify-center rounded-[18px] border-2 border-ink bg-peach-deep text-[22px] text-ink shadow-card-lg transition-transform active:translate-x-[1px] active:translate-y-[1px] active:shadow-card md:hidden"
+        style={{ bottom: 'calc(env(safe-area-inset-bottom) + 18px)' }}
+        className="fixed right-[14px] z-50 flex h-[52px] w-[52px] items-center justify-center rounded-[18px] border-2 border-ink bg-peach-deep text-ink shadow-card-lg transition-transform active:translate-x-[1px] active:translate-y-[1px] active:shadow-card md:hidden"
       >
-        <span aria-hidden>✦</span>
+        <Camera size={24} strokeWidth={2.25} aria-hidden />
       </Link>
 
       {/* hard-refresh chip — matches the desktop sidebar's v0.1 corner.
