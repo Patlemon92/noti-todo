@@ -165,6 +165,28 @@ export async function invokeExtraction(snapId: string): Promise<void> {
 // ============================================================================
 
 /**
+ * Find the hidden parent board that owns journal-extracted items.
+ * Returns null if the user hasn't saved any items yet (board is created
+ * lazily on first save via getOrCreateJournalBoard).
+ */
+export async function getJournalBoardId(): Promise<string | null> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+  const { data, error } = await supabase
+    .from('pages')
+    .select('id')
+    .eq('owner_id', user.id)
+    .eq('type', 'board')
+    .filter('properties->>kind', 'eq', 'journal')
+    .is('deleted_at', null)
+    .maybeSingle();
+  if (error) return null;
+  return (data?.id as string | undefined) ?? null;
+}
+
+/**
  * Get-or-create the hidden parent board that owns all journal-extracted
  * items. We keep it as a board (matches existing schema), tagged with
  * properties.kind='journal' so it's findable but hidden from the regular
