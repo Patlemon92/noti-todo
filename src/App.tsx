@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from './hooks/useAuth';
 import AuthView from './views/AuthView';
 import TodayView from './views/TodayView';
 import SnapView from './views/SnapView';
+import SnapStatusView from './views/SnapStatusView';
 import FocusView from './views/FocusView';
 import PageView from './views/PageView';
 import BoardsView from './views/BoardsView';
@@ -69,6 +70,14 @@ export default function App() {
             element={
               <Protected>
                 <SnapView />
+              </Protected>
+            }
+          />
+          <Route
+            path="/snap/:id"
+            element={
+              <Protected>
+                <SnapStatusView />
               </Protected>
             }
           />
