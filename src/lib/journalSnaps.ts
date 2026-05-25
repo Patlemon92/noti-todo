@@ -7,13 +7,36 @@
 // ============================================================================
 
 import { supabase } from './supabase';
+import { createPage } from './db';
+import { createReminder } from './reminders';
+import type { TaskProperties, TiptapDoc } from './types';
+
+// ----- extraction shape (matches the edge function output) ------------------
+
+export type ItemCategory = 'reminder' | 'task' | 'note';
+
+export interface ProcessedItem {
+  title: string;
+  category: ItemCategory;
+  raw_text: string;
+  resolved_date: string | null;          // ISO yyyy-mm-dd (UTC, no tz applied)
+  date_suggestions: string[];
+  time: { hour: number; minute: number } | null;
+  confidence: number;
+  flags: string[];
+}
+
+export interface ProcessedExtraction {
+  items: ProcessedItem[];
+  notes_blocks: Array<{ text: string; confidence: number }>;
+}
 
 export interface JournalSnap {
   id: string;
   owner_id: string;
   photo_storage_path: string;
   processed_at: string | null;
-  raw_extraction: unknown | null;
+  raw_extraction: ProcessedExtraction | null;
   error: string | null;
   created_at: string;
 }
@@ -135,4 +158,179 @@ export async function invokeExtraction(snapId: string): Promise<void> {
     body: { snap_id: snapId },
   });
   if (error) throw error;
+}
+
+// ============================================================================
+// save flow: extracted items → pages + reminders + notes
+// ============================================================================
+
+/**
+ * Get-or-create the hidden parent board that owns all journal-extracted
+ * items. We keep it as a board (matches existing schema), tagged with
+ * properties.kind='journal' so it's findable but hidden from the regular
+ * boards view.
+ */
+export async function getOrCreateJournalBoard(): Promise<string> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error('not signed in');
+
+  const { data: existing, error: findErr } = await supabase
+    .from('pages')
+    .select('id, properties')
+    .eq('owner_id', user.id)
+    .eq('type', 'board')
+    .filter('properties->>kind', 'eq', 'journal')
+    .is('deleted_at', null)
+    .maybeSingle();
+  if (findErr) throw findErr;
+  if (existing) return existing.id as string;
+
+  const board = await createPage({
+    type: 'board',
+    title: 'from journal',
+    properties: {
+      // Tag this board so we can find it again, and hide from the (also
+      // hidden post-pivot) boards view. The `BoardProperties` type doesn't
+      // include `kind` — we cast through unknown to keep the typed surface
+      // clean for the rest of the app.
+      kind: 'journal',
+      hidden: true,
+    } as unknown as TaskProperties,
+  });
+  return board.id;
+}
+
+/**
+ * Build an ISO due_at from a snap-extracted resolved_date + time in the
+ * caller's local timezone. resolved_date is "yyyy-mm-dd" (UTC calendar
+ * day); we interpret it as a local date and combine with hour/minute to
+ * produce a real Date → ISO.
+ */
+export function buildDueAt(
+  resolvedDate: string,
+  time: { hour: number; minute: number } | null,
+): string {
+  const [y, m, d] = resolvedDate.split('-').map((s) => parseInt(s, 10));
+  const local = new Date(
+    y,
+    (m ?? 1) - 1,
+    d ?? 1,
+    time?.hour ?? 9,
+    time?.minute ?? 0,
+    0,
+    0,
+  );
+  return local.toISOString();
+}
+
+export interface SaveItemInput {
+  title: string;
+  category: ItemCategory;
+  resolved_date: string | null;
+  time: { hour: number; minute: number } | null;
+  raw_text: string;
+}
+
+export interface SaveNoteInput {
+  text: string;
+}
+
+export interface SaveResult {
+  itemsCreated: number;
+  remindersCreated: number;
+  notesCreated: number;
+}
+
+/**
+ * Persist an approved set of extracted items + notes from a snap.
+ * - reminder/task items become pages under the hidden journal board;
+ *   reminder items also get a page_actions reminder row so the existing
+ *   push pipeline fires them.
+ * - notes_blocks are combined into a single note page titled after the
+ *   snap date.
+ */
+export async function saveExtractedItems(
+  snap: JournalSnap,
+  items: SaveItemInput[],
+  notes: SaveNoteInput[],
+): Promise<SaveResult> {
+  const result: SaveResult = {
+    itemsCreated: 0,
+    remindersCreated: 0,
+    notesCreated: 0,
+  };
+
+  let boardId: string | null = null;
+  if (items.length > 0) {
+    boardId = await getOrCreateJournalBoard();
+  }
+
+  for (const item of items) {
+    const props: TaskProperties & { raw_text?: string; from_snap?: string } = {
+      raw_text: item.raw_text,
+      from_snap: snap.id,
+    };
+    let dueAt: string | null = null;
+    if (item.resolved_date) {
+      dueAt = buildDueAt(item.resolved_date, item.time);
+      props.due_at = dueAt;
+    }
+
+    const page = await createPage({
+      type: 'task',
+      title: item.title.slice(0, 200),
+      parent_id: boardId,
+      properties: props,
+    });
+    result.itemsCreated++;
+
+    // create a reminder so the existing push pipeline picks it up.
+    // we attach reminders only when category === 'reminder' AND we have a
+    // due_at — bare tasks just sit in loose-ends.
+    if (item.category === 'reminder' && dueAt) {
+      await createReminder({
+        page_id: page.id,
+        due_at: dueAt,
+        text: item.title,
+      });
+      result.remindersCreated++;
+    }
+  }
+
+  if (notes.length > 0) {
+    const combined = notes
+      .map((n) => n.text.trim())
+      .filter(Boolean)
+      .join('\n\n');
+    if (combined) {
+      const body = textToTiptapDoc(combined);
+      const dateLabel = new Date(snap.created_at).toISOString().slice(0, 10);
+      await createPage({
+        type: 'note',
+        title: `from journal · ${dateLabel}`,
+        body,
+        properties: { from_snap: snap.id } as unknown as TaskProperties,
+      });
+      result.notesCreated++;
+    }
+  }
+
+  return result;
+}
+
+function textToTiptapDoc(text: string): TiptapDoc {
+  const paragraphs = text.split(/\n\n+/);
+  return {
+    type: 'doc',
+    content: paragraphs.map((p) => {
+      const t = p.trim();
+      if (!t) return { type: 'paragraph' };
+      return {
+        type: 'paragraph',
+        content: [{ type: 'text', text: t }],
+      };
+    }),
+  };
 }

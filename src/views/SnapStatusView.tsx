@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import BottomNav from '../components/ui/BottomNav';
 import TopStrip from '../components/ui/TopStrip';
+import ConfirmExtraction from '../components/page/ConfirmExtraction';
 import { getSnap, getSnapPhotoUrl, type JournalSnap } from '../lib/journalSnaps';
 
 /**
@@ -12,6 +13,7 @@ import { getSnap, getSnapPhotoUrl, type JournalSnap } from '../lib/journalSnaps'
  */
 export default function SnapStatusView() {
   const { id } = useParams<{ id: string }>();
+  const nav = useNavigate();
   const [snap, setSnap] = useState<JournalSnap | null>(null);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -82,20 +84,43 @@ export default function SnapStatusView() {
           </div>
         )}
 
-        {!loadError && photoUrl && (
-          <div className="mx-3.5">
-            <div className="overflow-hidden rounded-[18px] border-2 border-ink shadow-card-lg">
-              <img
-                src={photoUrl}
-                alt=""
-                className="block max-h-[60vh] w-full object-contain bg-bg"
-              />
-            </div>
+        {!loadError && photoUrl && snap && (
+          <>
+            {!snap.processed_at && !snap.error && (
+              <div className="mx-3.5">
+                <div className="overflow-hidden rounded-[18px] border-2 border-ink shadow-card-lg">
+                  <img
+                    src={photoUrl}
+                    alt=""
+                    className="block max-h-[60vh] w-full object-contain bg-bg"
+                  />
+                </div>
+                <ProcessingBanner />
+              </div>
+            )}
 
-            {!snap?.processed_at && !snap?.error && <ProcessingBanner />}
-            {snap?.error && <ErrorBanner message={snap.error} />}
-            {snap?.processed_at && snap.raw_extraction != null && <DoneBanner />}
-          </div>
+            {snap.error && (
+              <div className="mx-3.5">
+                <div className="overflow-hidden rounded-[18px] border-2 border-ink shadow-card-lg">
+                  <img
+                    src={photoUrl}
+                    alt=""
+                    className="block max-h-[60vh] w-full object-contain bg-bg"
+                  />
+                </div>
+                <ErrorBanner message={snap.error} />
+              </div>
+            )}
+
+            {snap.processed_at && snap.raw_extraction != null && !snap.error && (
+              <ConfirmExtraction
+                snap={snap}
+                photoUrl={photoUrl}
+                extraction={snap.raw_extraction}
+                onSaved={() => nav('/today')}
+              />
+            )}
+          </>
         )}
       </div>
       <BottomNav />
@@ -127,22 +152,3 @@ function ErrorBanner({ message }: { message: string }) {
   );
 }
 
-function DoneBanner() {
-  // phase 4 placeholder — the confirm screen replaces this in phase 6.
-  return (
-    <div className="mt-5 rounded-[16px] border-2 border-ink bg-mint px-4 py-5 text-center">
-      <p className="mb-1 font-mono text-[12px] uppercase tracking-mono-wide text-ink">
-        page read
-      </p>
-      <p className="mb-3 text-[13px] text-ink">
-        extraction came back. the confirm-and-edit screen lands in phase 6.
-      </p>
-      <Link
-        to="/today"
-        className="inline-flex items-center gap-2 rounded-[12px] border-2 border-ink bg-surface px-4 py-2 font-sans text-[14px] font-semibold text-ink shadow-card-sm active:translate-x-[1px] active:translate-y-[1px]"
-      >
-        back to today
-      </Link>
-    </div>
-  );
-}
