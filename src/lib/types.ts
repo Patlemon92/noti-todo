@@ -111,8 +111,21 @@ export interface NoteCanvasData {
   h?: number;
 }
 
+export type CoverColor = PastelColor | 'kraft' | 'ink' | 'coral';
+export type CoverPattern = 'blank' | 'dotted' | 'lined' | 'grid';
+
+export interface NoteCover {
+  color: CoverColor;
+  /** subtle paper pattern shown on the cover face */
+  pattern?: CoverPattern;
+  /** optional ribbon-marker accent; null/undefined = no ribbon */
+  ribbon?: PastelColor | null;
+}
+
 export interface NoteProperties {
   canvas?: NoteCanvasData;
+  /** Shelf identity — color/pattern/ribbon of the notebook's cover. */
+  cover?: NoteCover;
 }
 
 export type PageProperties =
