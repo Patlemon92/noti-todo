@@ -91,6 +91,17 @@ function hydratePages(initial?: NoteCanvasData): NotePage[] {
   ];
 }
 
+type TiptapNode = { type?: string; text?: string; content?: TiptapNode[] };
+
+/** True if a page already carries typed text (legacy plain or Tiptap body). */
+function pageHasText(p?: NotePage): boolean {
+  if (!p) return false;
+  if (p.text && p.text.trim()) return true;
+  const walk = (nodes?: TiptapNode[]): boolean =>
+    !!nodes?.some((n) => (n.type === 'text' && !!n.text?.trim()) || walk(n.content));
+  return walk((p.body as { content?: TiptapNode[] } | undefined)?.content);
+}
+
 /** Each line of plain text becomes a Tiptap paragraph. */
 function textToTiptapDoc(text: string): TiptapDoc {
   if (!text || !text.trim()) {
@@ -113,7 +124,12 @@ function textToTiptapDoc(text: string): TiptapDoc {
 export default function NoteCanvas({ initial, onSave }: Props) {
   const [pages, setPages] = useState<NotePage[]>(() => hydratePages(initial));
 
-  const [tool, setTool] = useState<Tool>('text');
+  const [tool, setTool] = useState<Tool>(() => {
+    // Write-first, like goodnotes — open in pen. But if it's an existing typed
+    // note with no ink yet, open in text so a tap doesn't scribble over prose.
+    const first = initial?.pages?.[0];
+    return pageHasText(first) && (first?.strokes?.length ?? 0) === 0 ? 'text' : 'pen';
+  });
   const [penColor, setPenColor] = useState('#2a2520');
   const [penSize, setPenSize] = useState(4);
   const [hlColor, setHlColor] = useState('#fbeb5b');
@@ -122,6 +138,93 @@ export default function NoteCanvas({ initial, onSave }: Props) {
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
 
   const nextIdRef = useRef<number>(initial?.next_id ?? pages.length + 1);
+
+  // ----- undo / redo -----
+  // Covers ink, images, and page structure. Typed text has Tiptap's own
+  // history (⌘Z inside the editor). We observe committed `pages` changes and
+  // coalesce a burst (a continuous erase or drag, fast successive strokes)
+  // into a single entry, so undo steps feel like discrete actions.
+  const pagesRef = useRef(pages);
+  const undoRef = useRef<NotePage[][]>([]);
+  const redoRef = useRef<NotePage[][]>([]);
+  const committedRef = useRef<NotePage[]>(pages);
+  const skipHistoryRef = useRef(false);
+  const coalesceTimer = useRef<number | null>(null);
+  const [histVersion, setHistVersion] = useState(0);
+
+  useEffect(() => {
+    pagesRef.current = pages;
+    if (skipHistoryRef.current) {
+      skipHistoryRef.current = false;
+      committedRef.current = pages;
+      return;
+    }
+    if (pages === committedRef.current) return;
+    if (coalesceTimer.current) window.clearTimeout(coalesceTimer.current);
+    coalesceTimer.current = window.setTimeout(() => {
+      if (committedRef.current !== pagesRef.current) {
+        undoRef.current.push(committedRef.current);
+        if (undoRef.current.length > 100) undoRef.current.shift();
+        redoRef.current = [];
+        committedRef.current = pagesRef.current;
+        setHistVersion((v) => v + 1);
+      }
+    }, 350);
+  }, [pages]);
+
+  const undo = useCallback(() => {
+    if (coalesceTimer.current) {
+      window.clearTimeout(coalesceTimer.current);
+      coalesceTimer.current = null;
+    }
+    // fold any not-yet-coalesced latest edit into the stack first
+    if (committedRef.current !== pagesRef.current) {
+      undoRef.current.push(committedRef.current);
+      committedRef.current = pagesRef.current;
+    }
+    if (undoRef.current.length === 0) return;
+    const prev = undoRef.current.pop()!;
+    redoRef.current.push(pagesRef.current);
+    skipHistoryRef.current = true;
+    committedRef.current = prev;
+    setPages(prev);
+    setHistVersion((v) => v + 1);
+  }, []);
+
+  const redo = useCallback(() => {
+    if (redoRef.current.length === 0) return;
+    if (coalesceTimer.current) {
+      window.clearTimeout(coalesceTimer.current);
+      coalesceTimer.current = null;
+    }
+    const next = redoRef.current.pop()!;
+    undoRef.current.push(pagesRef.current);
+    skipHistoryRef.current = true;
+    committedRef.current = next;
+    setPages(next);
+    setHistVersion((v) => v + 1);
+  }, []);
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (!(e.metaKey || e.ctrlKey)) return;
+      const k = e.key.toLowerCase();
+      if (k !== 'z' && k !== 'y') return;
+      const a = document.activeElement as HTMLElement | null;
+      if (a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA' || a.isContentEditable)) {
+        return; // let the text editor handle its own undo
+      }
+      e.preventDefault();
+      if (k === 'y' || e.shiftKey) redo();
+      else undo();
+    }
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [undo, redo]);
+
+  // read histVersion so undo/redo enabled state recomputes after each change
+  const canUndo = histVersion > -1 && undoRef.current.length > 0;
+  const canRedo = redoRef.current.length > 0;
 
   // ----- mutators -----
   function patchPage(id: number, patch: Partial<NotePage>) {
@@ -315,6 +418,13 @@ export default function NoteCanvas({ initial, onSave }: Props) {
       {/* slim toolbar — same horizontal width as the paper, sits just above it */}
       <div className="mb-1 px-3.5 sm:px-8">
         <div className="mx-auto flex max-w-[1500px] items-center justify-between gap-1 rounded-pill border border-ink/10 bg-bg-soft/60 px-1.5 py-0.5">
+          <ToolIcon onClick={undo} disabled={!canUndo} label="undo">
+            ↶
+          </ToolIcon>
+          <ToolIcon onClick={redo} disabled={!canRedo} label="redo">
+            ↷
+          </ToolIcon>
+          <span className="mx-1 h-4 w-px bg-ink/15" />
           <ToolIcon active={tool === 'text'} onClick={() => { setTool('text'); setShowSettings(false); }} label="text">
             T
           </ToolIcon>
@@ -1282,15 +1392,17 @@ function svgPathFromStroke(
     const r = size / 2;
     return `M${(x - r).toFixed(2)} ${y.toFixed(2)} a${r} ${r} 0 1 0 ${(2 * r).toFixed(2)} 0 a${r} ${r} 0 1 0 ${(-2 * r).toFixed(2)} 0 Z`;
   }
-  // Felt-tip pen + highlighter: uniform width, round caps, no calligraphic
-  // taper. No pressure response — finger/pencil/mouse all draw a consistent
-  // marker line.
+  // Pen tapers thick/thin: from real pencil pressure (apple pencil) or from
+  // velocity (finger/mouse, where pressure is constant). Highlighter stays a
+  // flat, even marker — that's how highlighters look.
+  const isHl = tool === 'highlighter';
+  const hasRealPressure = inputType === 'pen';
   const stroke = getStroke(points, {
     size,
-    thinning: 0,
+    thinning: isHl ? 0 : 0.58,
     smoothing: 0.5,
-    streamline: tool === 'highlighter' ? 0.4 : 0.5,
-    simulatePressure: false,
+    streamline: isHl ? 0.4 : 0.5,
+    simulatePressure: isHl ? false : !hasRealPressure,
     last: true,
     start: { taper: 0, cap: true },
     end: { taper: 0, cap: true },
