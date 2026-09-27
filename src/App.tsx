@@ -1,24 +1,30 @@
-import { useEffect } from 'react';
+import { Suspense, lazy, useEffect } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import AuthView from './views/AuthView';
-import TodayView from './views/TodayView';
-import SnapView from './views/SnapView';
-import SnapStatusView from './views/SnapStatusView';
-import FocusView from './views/FocusView';
-import PageView from './views/PageView';
-import BoardsView from './views/BoardsView';
-import NotesView from './views/NotesView';
-import ProfileView from './views/ProfileView';
-import DoneView from './views/DoneView';
-import TrashView from './views/TrashView';
+import MyDayView from './views/MyDayView';
+import { isDemo } from './lib/demoBoard';
+// Everything but the front door loads when first opened, so the app opens fast.
+const TodayView = lazy(() => import('./views/TodayView'));
+const SnapView = lazy(() => import('./views/SnapView'));
+const SnapStatusView = lazy(() => import('./views/SnapStatusView'));
+const FocusView = lazy(() => import('./views/FocusView'));
+const PageView = lazy(() => import('./views/PageView'));
+const BoardsView = lazy(() => import('./views/BoardsView'));
+const NotesView = lazy(() => import('./views/NotesView'));
+const ProfileView = lazy(() => import('./views/ProfileView'));
+const DoneView = lazy(() => import('./views/DoneView'));
+const TrashView = lazy(() => import('./views/TrashView'));
+const ProjectsView = lazy(() => import('./views/ProjectsView'));
+const ArchiveView = lazy(() => import('./views/ArchiveView'));
 import InstallPrompt from './pwa/InstallPrompt';
 import Sidebar from './components/ui/Sidebar';
-import CommandPalette from './components/cmd/CommandPalette';
+const CommandPalette = lazy(() => import('./components/cmd/CommandPalette'));
 
 function Protected({ children }: { children: JSX.Element }) {
   const { session, loading } = useAuth();
   const location = useLocation();
+  if (isDemo()) return children; // development build only: the sample board
   if (loading) return <FullPageLoader />;
   if (!session) return <Navigate to="/auth" replace state={{ from: location }} />;
   return children;
@@ -27,7 +33,7 @@ function Protected({ children }: { children: JSX.Element }) {
 function PublicOnly({ children }: { children: JSX.Element }) {
   const { session, loading } = useAuth();
   if (loading) return <FullPageLoader />;
-  if (session) return <Navigate to="/today" replace />;
+  if (session) return <Navigate to="/day" replace />;
   return children;
 }
 
@@ -48,6 +54,7 @@ export default function App() {
         <ShellChrome />
         <RouteBlur />
         <main className="md:ml-[64px]">
+        <Suspense fallback={<FullPageLoader />}>
         <Routes>
           <Route
             path="/auth"
@@ -55,6 +62,30 @@ export default function App() {
               <PublicOnly>
                 <AuthView />
               </PublicOnly>
+            }
+          />
+          <Route
+            path="/day"
+            element={
+              <Protected>
+                <MyDayView />
+              </Protected>
+            }
+          />
+          <Route
+            path="/projects"
+            element={
+              <Protected>
+                <ProjectsView />
+              </Protected>
+            }
+          />
+          <Route
+            path="/archive"
+            element={
+              <Protected>
+                <ArchiveView />
+              </Protected>
             }
           />
           <Route
@@ -138,11 +169,12 @@ export default function App() {
               </Protected>
             }
           />
-          <Route path="*" element={<Navigate to="/today" replace />} />
+          <Route path="*" element={<Navigate to="/day" replace />} />
         </Routes>
+        </Suspense>
         </main>
         <InstallPrompt />
-        <CommandPalette />
+        <Suspense fallback={null}><CommandPalette /></Suspense>
       </div>
     </AuthProvider>
   );

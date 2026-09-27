@@ -1,64 +1,49 @@
 import { NavLink, Link } from 'react-router-dom';
 import clsx from 'clsx';
 import { Camera } from 'lucide-react';
-import { hardRefresh } from '../../lib/hardRefresh';
 
 const ITEMS = [
-  { to: '/today', label: 'today', icon: '✦' },
+  { to: '/day', label: 'my day', icon: '✦' },
+  { to: '/projects', label: 'projects', icon: '▤' },
   { to: '/notes', label: 'notes', icon: '✎' },
   { to: '/profile', label: 'you', icon: '◉' },
 ] as const;
 
+/**
+ * Phone navigation: one full-width bar in thumb reach, icon over word so four
+ * sections and the snap button fit a 375px screen without anything wrapping
+ * or hiding behind anything else. (The hard-refresh chip moved to "you".)
+ */
 export default function BottomNav() {
   return (
-    <>
-      <nav
-        aria-label="primary"
-        className="fixed bottom-[14px] left-1/2 z-50 flex -translate-x-1/2 gap-[2px] rounded-[24px] border-2 border-ink bg-ink p-[6px] shadow-[4px_4px_0_rgba(42,37,32,0.22)] md:hidden"
-      >
-        {ITEMS.map((it) => (
-          <NavLink
-            key={it.to}
-            to={it.to}
-            className={({ isActive }) =>
-              clsx(
-                'flex h-[42px] items-center justify-center gap-1.5 rounded-[18px] px-3 font-sans text-[14px] font-semibold transition-colors sm:px-4 sm:text-[15px]',
-                isActive
-                  ? 'bg-peach-deep text-ink'
-                  : 'text-bg opacity-55 hover:opacity-90',
-              )
-            }
-          >
-            <span className="text-[14px]">{it.icon}</span>
-            <span>{it.label}</span>
-          </NavLink>
-        ))}
-      </nav>
-
-      {/* snap FAB — primary action post-pivot. coexists with the centered
-       * nav pill and the bottom-left hardRefresh chip.
-       * bottom offset respects iPhone safe area so the home indicator
-       * doesn't clip it. */}
+    <nav
+      aria-label="primary"
+      style={{ bottom: 'calc(env(safe-area-inset-bottom) + 10px)' }}
+      className="fixed inset-x-3 z-50 flex items-center gap-1 rounded-[24px] border-2 border-ink bg-ink p-1.5 shadow-[4px_4px_0_rgba(42,37,32,0.22)] md:hidden"
+    >
+      {ITEMS.map((it) => (
+        <NavLink
+          key={it.to}
+          to={it.to}
+          className={({ isActive }) =>
+            clsx(
+              'flex h-[50px] min-w-0 flex-1 flex-col items-center justify-center gap-[1px] rounded-[18px] font-sans text-[12px] font-semibold leading-none transition-colors',
+              isActive ? 'bg-peach-deep text-ink' : 'text-bg opacity-60 hover:opacity-90',
+            )
+          }
+        >
+          <span className="text-[15px]" aria-hidden>{it.icon}</span>
+          <span className="whitespace-nowrap">{it.label}</span>
+        </NavLink>
+      ))}
       <Link
         to="/snap"
         title="snap a journal page"
         aria-label="snap a journal page"
-        style={{ bottom: 'calc(env(safe-area-inset-bottom) + 18px)' }}
-        className="fixed right-[14px] z-50 flex h-[52px] w-[52px] items-center justify-center rounded-[18px] border-2 border-ink bg-peach-deep text-ink shadow-card-lg transition-transform active:translate-x-[1px] active:translate-y-[1px] active:shadow-card md:hidden"
+        className="flex h-[50px] w-[50px] shrink-0 items-center justify-center rounded-[18px] border-2 border-bg bg-peach-deep text-ink active:translate-y-[1px]"
       >
-        <Camera size={24} strokeWidth={2.25} aria-hidden />
+        <Camera size={22} strokeWidth={2.25} aria-hidden />
       </Link>
-
-      {/* hard-refresh chip — matches the desktop sidebar's v0.1 corner.
-       * sits bottom-left of the viewport so the centered nav pill stays clean. */}
-      <button
-        onClick={hardRefresh}
-        title="hard refresh"
-        aria-label="hard refresh"
-        className="fixed bottom-[20px] left-[14px] z-50 rounded-md px-1.5 py-1 font-mono text-[10px] uppercase tracking-mono-wide text-ink-faint transition-colors hover:bg-bg-soft hover:text-ink md:hidden"
-      >
-        v0.1
-      </button>
-    </>
+    </nav>
   );
 }

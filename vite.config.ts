@@ -19,13 +19,13 @@ export default defineConfig({
       manifest: {
         name: 'noti-todo',
         short_name: 'todo',
-        description: 'adhd-friendly attention guidance — one thing at a time',
-        start_url: '/focus',
+        description: 'my day, my projects, my notes — a board that runs itself',
+        start_url: '/day',
         scope: '/',
         display: 'standalone',
         background_color: '#f3ebd9',
         theme_color: '#f3ebd9',
-        orientation: 'portrait',
+        orientation: 'any',
         icons: [
           { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
           { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },

@@ -5,7 +5,8 @@ import { useCommandPalette } from '../cmd/CommandPalette';
 import { hardRefresh } from '../../lib/hardRefresh';
 
 const ITEMS = [
-  { to: '/today', label: 'today', icon: '✦' },
+  { to: '/day', label: 'my day', icon: '✦' },
+  { to: '/projects', label: 'projects', icon: '▤' },
   { to: '/notes', label: 'notes', icon: '✎' },
   { to: '/profile', label: 'you', icon: '◉' },
 ] as const;

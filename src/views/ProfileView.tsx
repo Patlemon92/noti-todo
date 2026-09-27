@@ -6,6 +6,7 @@ import clsx from 'clsx';
 import BottomNav from '../components/ui/BottomNav';
 import TopStrip from '../components/ui/TopStrip';
 import Sheet from '../components/ui/Sheet';
+import { hardRefresh } from '../lib/hardRefresh';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
 import {
@@ -132,6 +133,8 @@ export default function ProfileView() {
               member since {memberSince}
             </div>
           )}
+          {/* moved here from the phone's bottom corner, where it sat under the nav */}
+          <button onClick={hardRefresh} className="pill-action mx-auto mt-3">↻ refresh the app</button>
         </div>
 
         {/* stats */}
