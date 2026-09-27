@@ -68,7 +68,7 @@ export default function SnapStatusView() {
             reading your page
           </h1>
           <Link
-            to="/today"
+            to="/day"
             className="font-mono text-[11px] uppercase tracking-mono text-ink-soft underline"
           >
             done for now
@@ -117,7 +117,7 @@ export default function SnapStatusView() {
                 snap={snap}
                 photoUrl={photoUrl}
                 extraction={snap.raw_extraction}
-                onSaved={() => nav('/today')}
+                onSaved={() => nav('/day')}
               />
             )}
           </>

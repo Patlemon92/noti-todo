@@ -2,10 +2,9 @@ import { Suspense, lazy, useEffect } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import AuthView from './views/AuthView';
-import MyDayView from './views/MyDayView';
 import { isDemo } from './lib/demoBoard';
 // Everything but the front door loads when first opened, so the app opens fast.
-const TodayView = lazy(() => import('./views/TodayView'));
+const MyDayView = lazy(() => import('./views/MyDayView'));
 const SnapView = lazy(() => import('./views/SnapView'));
 const SnapStatusView = lazy(() => import('./views/SnapStatusView'));
 const FocusView = lazy(() => import('./views/FocusView'));
@@ -88,14 +87,8 @@ export default function App() {
               </Protected>
             }
           />
-          <Route
-            path="/today"
-            element={
-              <Protected>
-                <TodayView />
-              </Protected>
-            }
-          />
+          {/* the old journal "today" is retired: My Day is today now */}
+          <Route path="/today" element={<Navigate to="/day" replace />} />
           <Route
             path="/snap"
             element={

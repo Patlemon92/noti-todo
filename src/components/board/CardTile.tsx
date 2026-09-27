@@ -32,6 +32,7 @@ export default function CardTile({ card, projects, onOpen, onTick, lifted, hideP
         onClick={onTick}
         onPointerDown={(e) => e.stopPropagation()}
         onTouchStart={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.stopPropagation()}
         aria-label={done ? `not done: ${card.title}` : `done: ${card.title}`}
         className={clsx(
           'mt-[1px] flex h-[28px] w-[28px] shrink-0 items-center justify-center rounded-full border-2 border-ink text-[14px] font-bold transition-colors',
@@ -40,7 +41,7 @@ export default function CardTile({ card, projects, onOpen, onTick, lifted, hideP
       >
         {done ? '✓' : ''}
       </button>
-      <button type="button" onClick={onOpen} className="min-w-0 flex-1 text-left">
+      <button type="button" onClick={onOpen} onKeyDown={(e) => e.stopPropagation()} className="min-w-0 flex-1 text-left">
         <span className={clsx('block break-words text-[15px] font-medium leading-snug', done && 'text-ink-soft line-through')}>{card.title}</span>
         {(project || card.tags.length > 0 || due || steps || card.kind !== 'task') && (
           <span className="mt-1.5 flex flex-wrap items-center gap-1.5">

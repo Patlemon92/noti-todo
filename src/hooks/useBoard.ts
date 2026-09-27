@@ -15,6 +15,10 @@ export function useBoard() {
   const [data, setData] = useState<BoardData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const timer = useRef<number | undefined>(undefined);
+  // Writes still in flight. A reload now would show the database from before
+  // them and briefly undo what was just done, so it waits until they land.
+  const pending = useRef(0);
+  const reloadWhenDone = useRef(false);
 
   const reload = useCallback(async () => {
     if (isDemo()) { setData((d) => d ?? demoBoard()); return; }
@@ -32,7 +36,10 @@ export function useBoard() {
     if (!user) return;
     const soon = () => {
       window.clearTimeout(timer.current);
-      timer.current = window.setTimeout(reload, 250);
+      timer.current = window.setTimeout(() => {
+        if (pending.current > 0) reloadWhenDone.current = true;
+        else reload();
+      }, 250);
     };
     const ch = supabase.channel(`board:${user.id}`);
     for (const table of ['cards', 'projects', 'goals', 'routines']) {
@@ -49,15 +56,21 @@ export function useBoard() {
     };
   }, [user?.id, reload]);
 
+  const settle = useCallback(() => {
+    pending.current -= 1;
+    if (pending.current === 0 && reloadWhenDone.current) { reloadWhenDone.current = false; reload(); }
+  }, [reload]);
+
   /** Change a card on screen now, in the database next. */
   const patch = useCallback(async (id: number, fields: Partial<Card>) => {
     setData((d) => d && { ...d, cards: d.cards.map((c) => (c.id === id ? { ...c, ...fields } : c)) });
     if (isDemo()) return;
+    pending.current += 1;
     try { await updateCard(id, fields); } catch (e) {
       setError(e instanceof Error ? e.message : 'that change did not save');
-      reload();
-    }
-  }, [reload]);
+      reloadWhenDone.current = true;
+    } finally { settle(); }
+  }, [settle]);
 
   /** Add a card: a placeholder shows at once, the real one replaces it. */
   const add = useCallback(async (fields: Partial<Card> & { title: string }) => {
@@ -71,6 +84,7 @@ export function useBoard() {
     if (fields.lane === undefined && (draft.kind === 'task' || draft.kind === 'reminder')) draft.lane = laneFor(draft.due_date);
     setData((d) => d && { ...d, cards: [...d.cards, draft] });
     if (isDemo()) return draft;
+    pending.current += 1;
     try {
       const real = await createCard(fields);
       setData((d) => d && { ...d, cards: d.cards.map((c) => (c.id === temp ? real : c)) });
@@ -79,8 +93,8 @@ export function useBoard() {
       setError(e instanceof Error ? e.message : 'that card did not save');
       setData((d) => d && { ...d, cards: d.cards.filter((c) => c.id !== temp) });
       return null;
-    }
-  }, []);
+    } finally { settle(); }
+  }, [settle]);
 
   return { data, error, reload, patch, add, setData, clearError: () => setError(null) };
 }

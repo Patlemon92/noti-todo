@@ -4,7 +4,7 @@ import {
   DndContext, DragOverlay, KeyboardSensor, PointerSensor, TouchSensor, closestCenter, pointerWithin,
   useDroppable, useSensor, useSensors, type CollisionDetection, type DragEndEvent, type DragOverEvent, type DragStartEvent,
 } from '@dnd-kit/core';
-import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useBoard } from '../hooks/useBoard';
 import BottomNav from '../components/ui/BottomNav';
@@ -20,9 +20,12 @@ const TABS: { id: Tab; name: string }[] = [...LANES.map((l) => ({ id: l.id as Ta
 const LANE_IDS = LANES.map((l) => l.id);
 const isLane = (x: unknown): x is Lane => LANE_IDS.includes(x as Lane);
 
-// Pointer inside a column or chip wins; otherwise the nearest card.
+// A card under the finger wins over the column it sits in (so a drop lands
+// where you point); then a column or chip; otherwise the nearest card.
 const collide: CollisionDetection = (args) => {
   const inside = pointerWithin(args);
+  const cards = inside.filter((c) => typeof c.id === 'number');
+  if (cards.length) return cards;
   return inside.length ? inside : closestCenter(args);
 };
 
@@ -119,11 +122,27 @@ export default function MyDayView() {
     const to = laneOf(e.over.id, cur);
     if (!to) return;
     let ids = cur[to];
+    // Dropped on a card: it goes above that card if you let go over its top
+    // half, below if over its bottom half. Decided from where it was let go,
+    // not from the order shuffled during the drag, so it lands where you point.
     if (typeof e.over.id === 'number' && e.over.id !== id) {
-      ids = arrayMove(ids, ids.indexOf(id), ids.indexOf(e.over.id));
+      const act = e.active.rect.current.translated;
+      const below = !!act && act.top + act.height / 2 > e.over.rect.top + e.over.rect.height / 2;
+      ids = ids.filter((x) => x !== id);
+      const at = ids.indexOf(e.over.id as number);
+      ids.splice(at < 0 ? ids.length : at + (below ? 1 : 0), 0, id);
+    }
+    // You put it in Today, so you see it: if it would land past the three
+    // that show, it takes the last visible place and that card folds instead.
+    if (to === 'today' && !showWaiting && ids.indexOf(id) >= max) {
+      ids = ids.filter((x) => x !== id);
+      ids.splice(max - 1, 0, id);
     }
     const i = ids.indexOf(id);
-    const pos = between(byId.get(ids[i - 1])?.position, byId.get(ids[i + 1])?.position);
+    // Today's folded cards sit after the visible ones: the card goes before them.
+    const folded = view.lanes[to].filter((c) => c.id !== id && !ids.includes(c.id));
+    const next = byId.get(ids[i + 1]) ?? (i === ids.length - 1 ? folded[0] : undefined);
+    const pos = between(byId.get(ids[i - 1])?.position, next?.position);
     if (to === card.lane && Math.abs(pos - card.position) < 1e-9) return;
     patch(id, { lane: to, position: pos });
   }
@@ -182,7 +201,7 @@ export default function MyDayView() {
     <div className="flex min-h-[100dvh] flex-col pb-[150px] md:pb-6">
       <header className="flex items-end justify-between gap-3 px-4 pb-2 pt-4">
         <div>
-          <p className="mono-eyebrow">{new Date().toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' }).toUpperCase()}</p>
+          <p className="mono-eyebrow">{new Date().toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'Australia/Sydney' }).toUpperCase()}</p>
           <h1 className="font-serif text-[28px] font-semibold leading-none">my day</h1>
         </div>
         <a href="/archive" className="pill-action">done log</a>

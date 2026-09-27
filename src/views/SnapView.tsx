@@ -110,7 +110,7 @@ export default function SnapView() {
             snap a page
           </h1>
           <Link
-            to="/today"
+            to="/day"
             className="font-mono text-[11px] uppercase tracking-mono text-ink-soft underline"
           >
             cancel
